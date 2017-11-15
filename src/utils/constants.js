@@ -12,7 +12,6 @@ export const defaultState = {
 		supply: 0,
 		decimals: '',
 		reservedTokens: [],
-		reservedTokensElements: [],
 		reservedTokensInput: {dim: "tokens"}
 	},
 	crowdsale: [{
@@ -117,7 +116,6 @@ export const initialStepTwoValues = {
 		ticker: '',
 		decimals: '',
 		reservedTokens: [],
-		reservedTokensElements: [],
 		reservedTokensInput: {dim: "tokens"}
 	}
 }
@@ -311,6 +309,10 @@ export const DOWNLOAD_TYPE = {
   blob: 'blob'
 }
 
+export const INVESTMENT_OPTIONS = {
+  METAMASK: 'metamask',
+  QR: 'qr'
+}
 export const TOAST = {
 	TYPE: {
 		ERROR: 'error',
