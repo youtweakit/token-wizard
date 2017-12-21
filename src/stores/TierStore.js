@@ -1,46 +1,41 @@
 import { observable, action, computed } from 'mobx';
 import { VALIDATION_TYPES, defaultTiers } from '../utils/constants'
-import { validateName, validateTime, validateSupply, validateRate, validateAddress } from '../utils/utils'
-const { VALID, INVALID, EMPTY } = VALIDATION_TYPES
+import { validateName, validateTime, validateSupply, validateRate, validateAddress, validateLaterTime, validateLaterOrEqualTime } from '../utils/utils'
+const { VALID, INVALID } = VALIDATION_TYPES
 class TierStore {
 
   @observable tiers;
   @observable validTiers;
   @observable globalMinCap;
 
-	constructor(tiers = defaultTiers) {
-		this.tiers = tiers;
-		this.validTiers = [{
-			name: 'VALIDATED',
-			walletAddress: 'VALIDATED',
-			rate: 'EMPTY',
-			supply: 'EMPTY',
-			startTime: 'VALIDATED',
-			endTime: 'VALIDATED',
-			updatable: "VALIDATED"
-		}]
-	}
+  constructor(tiers = defaultTiers) {
+    this.tiers = tiers;
+    this.validTiers = [{
+      name: 'VALIDATED',
+      walletAddress: 'VALIDATED',
+      rate: 'EMPTY',
+      supply: 'EMPTY',
+      startTime: 'VALIDATED',
+      endTime: 'VALIDATED',
+      updatable: "VALIDATED"
+    }]
+  }
 
-	@action setGlobalMinCap = (minCap) => {
-		this.globalmincap = minCap
-	}
+  @action setGlobalMinCap = (minCap) => {
+    this.globalMinCap = minCap
+  }
 
   @action addTier = (tier) => {
-		this.tiers.push(tier)
-		console.log('tier', tier)
-		console.log('this.tiers', this.tiers)
-	}
+    this.tiers.push(tier)
+  }
 
   @action addTierValidations = (validations) => {
     this.validTiers.push(validations)
   }
 
   @action setTierProperty = (value, property, index) => {
-    console.log('value, property, index', value, property, index)
     let newTier = {...this.tiers[index]}
     newTier[property] = value
-    console.log('newTier[property]', newTier[property])
-    console.log('this.tiers[index]', this.tiers[index])
     this.tiers[index] = newTier;
   }
 
@@ -57,7 +52,7 @@ class TierStore {
       case 'name':
         this.validTiers[index][property] = validateName(this.tiers[index][property]) ? VALID : INVALID
         return
-        case 'walletAddress':
+      case 'walletAddress':
         this.validTiers[index][property] = validateAddress(this.tiers[index][property]) ? VALID : INVALID
         return
       case 'supply':
@@ -67,9 +62,17 @@ class TierStore {
         this.validTiers[index][property] = validateRate(this.tiers[index][property]) ? VALID : INVALID
         return
       case 'startTime':
-      case 'endTime':
+        if (index > 0) {
+          this.validTiers[index][property] = validateLaterOrEqualTime(this.tiers[index][property], this.tiers[index - 1].endTime) ? VALID : INVALID
+          return
+        }
         this.validTiers[index][property] = validateTime(this.tiers[index][property]) ? VALID: INVALID
         return
+      case 'endTime':
+        this.validTiers[index][property] = validateLaterTime(this.tiers[index][property], this.tiers[index].startTime) ? VALID : INVALID
+        return
+      default:
+        // do nothing
     }
   }
 
@@ -94,7 +97,7 @@ class TierStore {
     if (!this.validTiers) {
       return;
     }
-    this.validTiers.every((tier, index) => {
+    this.validTiers.forEach((tier, index) => {
       Object.keys(tier).forEach(key => {
         if (this.validTiers[index][key] === 'EMPTY') {
           this.validTiers[index][key] = 'INVALID';

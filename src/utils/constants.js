@@ -59,7 +59,28 @@ export const TRUNC_TO_DECIMALS = {
   DECIMALS18: -18
 }
 
-export const GAS_PRICE = 5000000000
+export const GAS_PRICE = {
+  SLOW: {
+    ID: 'slow',
+    PRICE: 5000000000,
+    DESCRIPTION: 'Slow and Cheap (5 Gwei)'
+  },
+  NORMAL: {
+    ID: 'normal',
+    PRICE: 10000000000,
+    DESCRIPTION: 'Normal (10 Gwei)'
+  },
+  FAST: {
+    ID: 'fast',
+    PRICE: 15000000000,
+    DESCRIPTION: 'Fast and Expensive (15 Gwei)'
+  },
+  CUSTOM: {
+    ID: 'custom',
+    PRICE: 0,
+    DESCRIPTION: 'Custom'
+  }
+}
 export const UNKNOWN = "Unknown"
 export const CHAINS = {
   UNKNOWN: 'Unknown',
@@ -89,6 +110,7 @@ export const VALIDATION_MESSAGES = {
   WALLET_ADDRESS: 'Please enter a valid address',
   START_TIME: 'Please enter a valid date later than now',
   END_TIME: 'Please enter a valid date later than start time',
+  MULTIPLE_TIERS_START_TIME: 'Please enter a valid date not less than the end time of the previous tier',
   RATE: 'Please enter a valid number greater than 0'
 }
 
@@ -110,7 +132,8 @@ export const TEXT_FIELDS = {
   VALUE: 'Value',
   MAX_CAP: 'Max cap',
   ALLOWMODIFYING: 'Allow modifying',
-  DISABLEWHITELISTING: 'Disable whitelisting'
+  DISABLEWHITELISTING: 'Disable whitelisting',
+  GAS_PRICE: 'Gas Price'
 }
 
 export const VALIDATION_TYPES = {
@@ -118,13 +141,13 @@ export const VALIDATION_TYPES = {
   EMPTY: 'EMPTY',
   INVALID: 'INVALID'
 }
-const { VALID, EMPTY, INVALID } = VALIDATION_TYPES
+const { VALID, EMPTY } = VALIDATION_TYPES
 
 export const intitialStepTwoValidations = {
   validations: {
-      name: EMPTY,
-      decimals: EMPTY,
-      ticker: EMPTY
+    name: EMPTY,
+    decimals: EMPTY,
+    ticker: EMPTY
   }
 }
 
@@ -142,22 +165,22 @@ export const initialStepTwoValues = {
 
 export const intitialStepThreeValidations = {
   validations: [{
-      tier: VALID,
-      startTime: VALID,
-      endTime: VALID,
-      walletAddress: EMPTY,
-      supply: VALID,
-      rate: EMPTY
+    tier: VALID,
+    startTime: VALID,
+    endTime: VALID,
+    walletAddress: EMPTY,
+    supply: VALID,
+    rate: EMPTY
   }]
 }
 
 export const initialStepThreeValues = {
   crowdsale: [{
-      tier: '',
-      startTime: '',
-      endTime: '',
-      walletAddress: '',
-      supply: ''
+    tier: '',
+    startTime: '',
+    endTime: '',
+    walletAddress: '',
+    supply: ''
   }]
 }
 
@@ -340,7 +363,7 @@ export const TOAST = {
     SUCCESS: 'warning'
   },
   MESSAGE: {
-		TRANSACTION_FAILED: 'Transaction has failed, please retry',
+    TRANSACTION_FAILED: 'Transaction has failed, please retry',
     CONTRACT_DOWNLOAD_FAILED: 'Contract Download failed',
     CONTRACT_DOWNLOAD_SUCCESS: 'A file with contracts and metadata downloaded on your computer'
   },

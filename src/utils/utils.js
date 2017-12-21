@@ -1,6 +1,6 @@
 import { VALIDATION_TYPES, TRUNC_TO_DECIMALS, TOAST } from './constants'
 import { contractStore, tokenStore, tierStore, web3Store } from '../stores'
-const { VALID, EMPTY, INVALID } = VALIDATION_TYPES
+const { VALID, INVALID } = VALIDATION_TYPES
 
 export function getQueryVariable(variable) {
   var query = window.location.search.substring(1);
@@ -19,7 +19,7 @@ export function getURLParam(key,target){
     target = window.location.href;
   }
 
-  key = key.replace(/[\[]/, "\\\[").replace(/[\]]/, "\\\]");
+  key = key.replace(/[[]/, "\\[").replace(/[\]]/, "\\]");
 
   var pattern = key + '=([^&#]+)';
   var o_reg = new RegExp(pattern,'ig');
@@ -36,127 +36,62 @@ export function getURLParam(key,target){
   if (!values.length) {
     return null;
   } else {
-    return values.length == 1 ? values[0] : values;
+    return values.length === 1 ? values[0] : values;
   }
 }
 
-export function setFlatFileContentToState(file, cb) {
-  readSolFile(file, function(content) {
-    cb(content);
-  });
+export function setFlatFileContentToState(file) {
+  return readSolFile(file)
 }
 
-export function getWhiteListWithCapCrowdsaleAssets(cb) {
-  const contractName = "CrowdsaleWhiteListWithCap";
-  let derivativesLength = 11;
-  let derivativesIterator = 0;
-  setFlatFileContentToState("./contracts/" + contractName + "_flat.sol", function(_src) {
-    derivativesIterator++;
-    contractStore.setContractProperty('crowdsale', 'src', _src);
+export function getWhiteListWithCapCrowdsaleAssets() {
+  return new Promise((resolve, reject) => {
+    const contractsRoute = './contracts/'
+    const crowdsaleFilename = 'CrowdsaleWhiteListWithCap'
+    const binAbi = ['bin', 'abi']
 
-    if (derivativesIterator === derivativesLength) {
-      cb(contractStore);
-    }
-  });
-  setFlatFileContentToState("./contracts/" + contractName + "_flat.bin", function(_bin) {
-    derivativesIterator++;
-    contractStore.setContractProperty('crowdsale', 'bin', _bin);
+    const crowdsaleFiles = ['sol', ...binAbi].map(ext => `${contractsRoute}${crowdsaleFilename}_flat.${ext}`)
+    const tokenFiles = binAbi.map(ext => `${contractsRoute}${crowdsaleFilename}Token_flat.${ext}`)
+    const pricingFiles = binAbi.map(ext => `${contractsRoute}${crowdsaleFilename}PricingStrategy_flat.${ext}`)
+    const finalizeFiles = binAbi.map(ext => `${contractsRoute}FinalizeAgent_flat.${ext}`)
+    const nullFiles = binAbi.map(ext => `${contractsRoute}NullFinalizeAgent_flat.${ext}`)
 
-    if (derivativesIterator === derivativesLength) {
-      cb(contractStore);
-    }
-  });
-  setFlatFileContentToState("./contracts/" + contractName + "_flat.abi", function(_abi) {
-    derivativesIterator++;
-    contractStore.setContractProperty('crowdsale', 'abi', JSON.parse(_abi));
+    const states = crowdsaleFiles.concat(tokenFiles, pricingFiles, finalizeFiles, nullFiles)
+      .map(setFlatFileContentToState)
 
-    if (derivativesIterator === derivativesLength) {
-      cb(contractStore);
-    }
-  });
-  setFlatFileContentToState("./contracts/" + contractName + "Token_flat.bin", function(_bin) {
-    derivativesIterator++;
-    contractStore.setContractProperty('token', 'bin', _bin);
-
-    if (derivativesIterator === derivativesLength) {
-      cb(contractStore);
-    }
-  });
-  setFlatFileContentToState("./contracts/" + contractName + "Token_flat.abi", function(_abi) {
-    derivativesIterator++;
-    contractStore.setContractProperty('token', 'abi', JSON.parse(_abi));
-
-    if (derivativesIterator === derivativesLength) {
-      cb(contractStore);
-    }
-  });
-  setFlatFileContentToState("./contracts/" + contractName + "PricingStrategy_flat.bin", function(_bin) {
-    derivativesIterator++;
-    contractStore.setContractProperty('pricingStrategy', 'bin', _bin);
-
-    if (derivativesIterator === derivativesLength) {
-      cb(contractStore);
-    }
-  });
-  setFlatFileContentToState("./contracts/" + contractName + "PricingStrategy_flat.abi", function(_abi) {
-    derivativesIterator++;
-    contractStore.setContractProperty('pricingStrategy', 'abi', JSON.parse(_abi));
-
-    if (derivativesIterator === derivativesLength) {
-      cb(contractStore);
-    }
-  });
-  const finalizeAgentContractName = "FinalizeAgent";
-  setFlatFileContentToState("./contracts/" + finalizeAgentContractName + "_flat.bin", function(_bin) {
-    derivativesIterator++;
-    contractStore.setContractProperty('finalizeAgent', 'bin', _bin);
-
-    if (derivativesIterator === derivativesLength) {
-      cb(contractStore);
-    }
-  });
-  setFlatFileContentToState("./contracts/" + finalizeAgentContractName + "_flat.abi", function(_abi) {
-    derivativesIterator++;
-    contractStore.setContractProperty('finalizeAgent', 'abi', JSON.parse(_abi));
-
-    if (derivativesIterator === derivativesLength) {
-      cb(contractStore);
-    }
-  });
-  const nullFinalizeAgentContractName = "NullFinalizeAgent";
-  setFlatFileContentToState("./contracts/" + nullFinalizeAgentContractName + "_flat.bin", function(_bin) {
-    derivativesIterator++;
-    contractStore.setContractProperty('nullFinalizeAgent', 'bin', _bin);
-
-    if (derivativesIterator === derivativesLength) {
-      cb(contractStore);
-    }
-  });
-  setFlatFileContentToState("./contracts/" + nullFinalizeAgentContractName + "_flat.abi", function(_abi) {
-    derivativesIterator++;
-    contractStore.setContractProperty('nullFinalizeAgent', 'abi', JSON.parse(_abi));
-
-    if (derivativesIterator === derivativesLength) {
-      cb(contractStore);
-    }
-  });
+    Promise.all(states)
+      .then(state => {
+        contractStore.setContractProperty('crowdsale', 'src', state[0])
+        contractStore.setContractProperty('crowdsale', 'bin', state[1])
+        contractStore.setContractProperty('crowdsale', 'abi', JSON.parse(state[2]))
+        contractStore.setContractProperty('token', 'bin', state[3])
+        contractStore.setContractProperty('token', 'abi', JSON.parse(state[4]))
+        contractStore.setContractProperty('pricingStrategy', 'bin', state[5])
+        contractStore.setContractProperty('pricingStrategy', 'abi', JSON.parse(state[6]))
+        contractStore.setContractProperty('finalizeAgent', 'bin', state[7])
+        contractStore.setContractProperty('finalizeAgent', 'abi', JSON.parse(state[8]))
+        contractStore.setContractProperty('nullFinalizeAgent', 'bin', state[9])
+        contractStore.setContractProperty('nullFinalizeAgent', 'abi', JSON.parse(state[10]))
+        resolve(contractStore)
+      })
+      .catch(reject)
+  })
 }
 
-function readSolFile(path, cb) {
-  var rawFile = new XMLHttpRequest();
-  rawFile.open("GET", path, true);
-  rawFile.onreadystatechange = function ()
-  {
-    if(rawFile.readyState === 4)
-    {
-      if(rawFile.status === 200 || rawFile.status === 0)
-      {
-        var allText = rawFile.responseText;
-        cb(allText);
+function readSolFile(path) {
+  return new Promise((resolve, reject) => {
+    const rawFile = new XMLHttpRequest()
+
+    rawFile.addEventListener('error', reject)
+    rawFile.open('GET', path, true)
+    rawFile.onreadystatechange = function () {
+      if (rawFile.readyState === 4 && (rawFile.status === 200 || rawFile.status === 0)) {
+        let allText = rawFile.responseText
+        resolve(allText)
       }
     }
-  };
-  rawFile.send(null);
+    rawFile.send(null)
+  })
 }
 
 export const findConstructor = (abi) => {
@@ -181,96 +116,97 @@ export const getconstructorParams = (abiConstructor, vals, crowdsaleNum) => {
       params.vals.push(vals[j]);
     } else {
       switch(inp.name) {
-        case "_startBlock": {
+        case "_startBlock":
           params.vals.push(tierStore.tiers[crowdsaleNum].startBlock);
-        } break;
-        case "_start": {
+          break;
+        case "_start":
           params.vals.push(toFixed(new Date(tierStore.tiers[crowdsaleNum].startTime).getTime()/1000).toString());
-        } break;
-        case "_endBlock": {
+          break;
+        case "_endBlock":
           params.vals.push(tierStore.tiers[crowdsaleNum].endBlock);
-        } break;
-        case "_end": {
+          break;
+        case "_end":
           params.vals.push(toFixed(new Date(tierStore.tiers[crowdsaleNum].endTime).getTime()/1000).toString());
-        } break;
-        case "_rate": {
+          break;
+        case "_rate":
           params.vals.push(tierStore.tiers[crowdsaleNum].rate);
-        } break;
+          break;
         case "_wallet":
-        case "_beneficiary": {
+        case "_beneficiary":
           params.vals.push(tierStore.tiers[crowdsaleNum].walletAddress);
-        } break;
-        case "_multisigWallet": {
+          break;
+        case "_multisigWallet":
           //params.vals.push(contractStore.multisig.addr);
           params.vals.push(tierStore.tiers[0].walletAddress);
-        } break;
-        case "_pricingStrategy": {
+          break;
+        case "_pricingStrategy":
           params.vals.push(contractStore.pricingStrategy.addr[crowdsaleNum]);
-        } break;
-        case "_token": {
+          break;
+        case "_token":
           params.vals.push(contractStore.token.addr);
-        } break;
-        case "_crowdsale": {
+          break;
+        case "_crowdsale":
           params.vals.push(contractStore.crowdsale.addr[crowdsaleNum]);
-        } break;
-        case "_crowdsaleSupply": {
+          break;
+        case "_crowdsaleSupply":
           params.vals.push(tierStore.tiers[crowdsaleNum].supply);
-        } break;
-        case "_name": {
+          break;
+        case "_name":
           params.vals.push(tokenStore.name);
-        } break;
-        case "_symbol": {
+          break;
+        case "_symbol":
           params.vals.push(tokenStore.ticker);
-        } break;
-        case "_decimals": {
+          break;
+        case "_decimals":
           params.vals.push(tokenStore.decimals);
-        } break;
-        case "_globalMinCap": {
+          break;
+        case "_globalMinCap":
           params.vals.push(tierStore.tiers[0].whitelistdisabled === "yes"?tokenStore.globalmincap?toFixed(tokenStore.globalmincap*10**tokenStore.decimals).toString():0:0);
-        } break;
+          break;
         case "_tokenSupply":
-        case "_initialSupply": {
+        case "_initialSupply":
           params.vals.push(tokenStore.supply);
-        } break;
-        case "_maximumSellableTokens": {
+          break;
+        case "_maximumSellableTokens":
           params.vals.push(toFixed(tierStore.tiers[crowdsaleNum].supply*10**tokenStore.decimals).toString());
-        } break;
-        case "_minimumFundingGoal": {
+          break;
+        case "_minimumFundingGoal":
           params.vals.push(0);
-        } break;
-        case "_mintable": {
+          break;
+        case "_mintable":
           params.vals.push(true);
-        } break;
-        case "_tranches": {
+          break;
+        case "_tranches":
           params.vals.push(tierStore.tiers[crowdsaleNum].tranches);
-        } break;
-        case "_secondsTimeLocked": {
+          break;
+        case "_secondsTimeLocked":
           params.vals.push(1)
-        } break;
-        case "_tokenTransferProxy": {
+          break;
+        case "_tokenTransferProxy":
           params.vals.push(contractStore.tokenTransferProxy.addr)
-        } break;
-        case "_required": {
+          break;
+        case "_required":
           params.vals.push(1)
-        } break;
-        case "_owners": {
+          break;
+        case "_owners":
           let owners = [];
           owners.push(tierStore.tiers[crowdsaleNum].walletAddress);
           params.vals.push(owners)
-        } break;
-        case "_oneTokenInWei": {
+          break;
+        case "_oneTokenInWei":
           let oneTokenInETHRaw = toFixed(1/tierStore.tiers[crowdsaleNum].rate).toString()
           let oneTokenInETH = floorToDecimals(TRUNC_TO_DECIMALS.DECIMALS18, oneTokenInETHRaw)
-          params.vals.push(web3Store.web3.utils.toWei(oneTokenInETH, "ether"));                } break;
-        case "_isUpdatable": {
-          params.vals.push(tierStore.tiers[crowdsaleNum].updatable?tierStore.tiers[crowdsaleNum].updatable=="on"?true:false:false);
-        } break;
-        case "_isWhiteListed": {
-          params.vals.push(tierStore.tiers[0].whitelistdisabled?tierStore.tiers[0].whitelistdisabled=="yes"?false:true:false);
-        } break;
-        default: {
+          params.vals.push(web3Store.web3.utils.toWei(oneTokenInETH, "ether"));
+          break;
+        case "_isUpdatable":
+          params.vals.push(tierStore.tiers[crowdsaleNum].updatable?tierStore.tiers[crowdsaleNum].updatable==="on"?true:false:false);
+          break;
+        case "_isWhiteListed":
+          params.vals.push(tierStore.tiers[0].whitelistdisabled?tierStore.tiers[0].whitelistdisabled==="yes"?false:true:false);
+          break;
+        default:
           params.vals.push("");
-        } break;
+          break;
       }
     }
   }
@@ -303,13 +239,15 @@ if (!Math.floor10) {
 
 const getTimeAsNumber = (time) => new Date(time).getTime()
 
-export const getOldState = (props, defaultState) => props && props.location && props.location.query && props.location.query.state || defaultState
+export const getOldState = (props, defaultState) => (props && props.location && props.location.query && props.location.query.state) || defaultState
 
 export const getStepClass = (step, activeStep) => step === activeStep ? "step-navigation step-navigation_active" : "step-navigation"
 
 export const stepsAreValid = (steps) => {
   let newSteps = Object.assign({}, steps)
-  newSteps[0] !== undefined ? delete newSteps[0] : ''
+  if (newSteps[0] !== undefined) {
+    delete newSteps[0]
+  }
   return Object.values(newSteps).length > 3 && Object.values(newSteps).every(step => step === VALID)
 }
 
@@ -324,6 +262,10 @@ export const validateDecimals = (decimals) => isNaN(Number(decimals)) === false 
 export const validateTicker = (ticker) => typeof ticker === 'string' && ticker.length < 4 && ticker.length > 0
 
 export const validateTime = (time) => getTimeAsNumber(time) > Date.now()
+
+export const validateLaterTime = (laterTime, previousTime) => getTimeAsNumber(laterTime) > getTimeAsNumber(previousTime)
+
+export const validateLaterOrEqualTime = (laterTime, previousTime) => getTimeAsNumber(laterTime) >= getTimeAsNumber(previousTime)
 
 export const validateRate = (rate) => isNaN(Number(rate)) === false && Number(rate) > 0
 
@@ -345,8 +287,6 @@ const inputFieldValidators = {
   walletAddress: validateAddress,
   rate: validateRate
 }
-
-const inputFieldIsUnsubmitted = (currentValidation, newValidation) => currentValidation === EMPTY
 
 const isNotWhiteListTierObject = (value) => !(typeof value === 'object' && value.hasOwnProperty('whitelist') === true && value.hasOwnProperty('tier') === true)
 
@@ -378,7 +318,7 @@ export const allFieldsAreValid = (parent, state) => {
   if( Object.prototype.toString.call( newState[parent] ) === '[object Array]' ) {
     if (newState[parent].length > 0) {
       for (let i = 0; i < newState[parent].length; i++) {
-        Object.keys(newState[parent][i]).map(property => {
+        Object.keys(newState[parent][i]).forEach(property => { // eslint-disable-line no-loop-func
           values.push(newState[parent][i][property])
           properties.push(property);
         })
@@ -401,7 +341,7 @@ export const allFieldsAreValid = (parent, state) => {
       value = newState[parent][property]
     }
     iterator++
-    if (parent == "token" && property == "supply") return VALID
+    if (parent === "token" && property === "supply") return VALID
     return validateValue(value, property)
   })
 
@@ -410,13 +350,13 @@ export const allFieldsAreValid = (parent, state) => {
 
 export function toFixed(x) {
   if (Math.abs(x) < 1.0) {
-    var e = parseInt(x.toString().split('e-')[1]);
+    let e = parseInt(x.toString().split('e-')[1], 10);
     if (e) {
       x *= Math.pow(10,e-1);
       x = '0.' + (new Array(e)).join('0') + x.toString().substring(2);
     }
   } else {
-    var e = parseInt(x.toString().split('+')[1]);
+    let e = parseInt(x.toString().split('+')[1], 10);
     if (e > 20) {
       e -= 20;
       x /= Math.pow(10,e);
