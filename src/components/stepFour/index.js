@@ -1,6 +1,11 @@
 import React from 'react'
 import '../../assets/stylesheets/application.css'
-import { checkWeb3, deployContract, getNetworkVersion } from '../../utils/blockchainHelpers'
+import {
+  checkWeb3,
+  deployContract,
+  getNetworkVersion,
+  registerCrowdsaleAddress
+} from '../../utils/blockchainHelpers'
 import {
   addWhiteListRecursive,
   download,
@@ -101,6 +106,7 @@ const { PUBLISH } = NAVIGATION_STEPS
         .then(() => this.deployToken())
         .then(() => this.deployPricingStrategy())
         .then(() => this.deployCrowdsale())
+        .then(() => registerCrowdsaleAddress(web3, this.props.contractStore))
         .then(() => this.calculateABIEncodedArgumentsForFinalizeAgentContractDeployment())
         .then(() => this.deployFinalizeAgent())
         .catch(error => this.handleError(error))
@@ -385,6 +391,7 @@ const { PUBLISH } = NAVIGATION_STEPS
     const whitelistDisabled = initialTier.whitelistdisabled
 
     return [
+      tier.tier,
       contractStore.token.addr,
       contractStore.pricingStrategy.addr[i],
       initialTier.walletAddress,

@@ -1,23 +1,26 @@
 import React from "react";
 import "../../assets/stylesheets/application.css";
 import { Link } from "react-router-dom";
-import { setExistingContractParams } from "../../utils/blockchainHelpers";
+import { setExistingContractParams, getNetworkVersion } from "../../utils/blockchainHelpers";
 import { defaultCompanyStartDate } from "./utils";
-import { defaultCompanyEndDate } from "../../utils/utils";
+import { defaultCompanyEndDate, gweiToWei, weiToGwei } from "../../utils/utils";
 import { StepNavigation } from "../Common/StepNavigation";
 import { InputField } from "../Common/InputField";
 import { RadioInputField } from "../Common/RadioInputField";
 import { CrowdsaleBlock } from "./CrowdsaleBlock";
 import { WhitelistInputBlock } from "../Common/WhitelistInputBlock";
+import { web3Store } from '../../stores'
 import {
   NAVIGATION_STEPS,
   VALIDATION_MESSAGES,
   VALIDATION_TYPES,
   TEXT_FIELDS,
-  CONTRACT_TYPES,
-  GAS_PRICE
+  CONTRACT_TYPES
 } from "../../utils/constants";
 import { inject, observer } from "mobx-react";
+import { Loader } from '../Common/Loader'
+import { noGasPriceAvailable, mainnetIsOnMaintenance } from '../../utils/alerts'
+
 const { CROWDSALE_SETUP } = NAVIGATION_STEPS;
 const { EMPTY, VALID } = VALIDATION_TYPES;
 const {
@@ -32,12 +35,12 @@ const {
   DISABLEWHITELISTING
 } = TEXT_FIELDS;
 
-@inject("contractStore", "crowdsaleBlockListStore", "pricingStrategyStore", "web3Store", "tierStore", "generalStore")
+@inject("contractStore", "crowdsaleBlockListStore", "pricingStrategyStore", "web3Store", "tierStore", "generalStore", "gasPriceStore")
 @observer
 export class stepThree extends React.Component {
   constructor(props) {
     super(props);
-    const { contractStore, crowdsaleBlockListStore, tierStore } = props;
+    const { contractStore, crowdsaleBlockListStore, tierStore, gasPriceStore } = props;
     window.scrollTo(0, 0);
     if (contractStore.crowdsale.addr.length > 0) {
       contractStore.setContractProperty("pricingStrategy", "addr", []);
@@ -49,7 +52,8 @@ export class stepThree extends React.Component {
     tierStore.setTierProperty("yes", "whitelistdisabled", 0);
 
     this.state = {
-      gasPriceSelected: GAS_PRICE.FAST.ID,
+      loading: true,
+      gasPriceSelected: gasPriceStore.slow.id
     }
   }
 
@@ -156,36 +160,48 @@ export class stepThree extends React.Component {
     }
 
     if (tierStore.areTiersValid) {
-      this.props.history.push("/4");
+      web3Store.getWeb3((web3) => {
+        getNetworkVersion(web3Store.web3)
+          .then((networkId) => {
+            if (networkId == 1)
+              mainnetIsOnMaintenance();
+            else
+              this.props.history.push("/4");
+          })
+      });
     } else {
       this.showErrorMessages(e);
     }
   };
 
   componentDidMount() {
-    const { tierStore, web3Store } = this.props;
+    const { tierStore, web3Store, gasPriceStore } = this.props;
     const { curAddress } = web3Store;
     tierStore.setTierProperty(curAddress, "walletAddress", 0);
     tierStore.setTierProperty(defaultCompanyStartDate(), "startTime", 0);
     tierStore.setTierProperty(defaultCompanyEndDate(tierStore.tiers[0].startTime), "endTime", 0);
+
+    gasPriceStore.updateValues()
+      .then(() => this.setState({ loading: false }))
+      .catch(() => {
+        this.setState({ loading: false })
+        noGasPriceAvailable()
+      })
   }
 
-  setGasPrice({ ID, PRICE }) {
+  setGasPrice({ id, price }) {
     this.setState({
-      gasPriceSelected: ID
+      gasPriceSelected: id
     })
 
     // Don't modify the price when choosing custom
-    if (ID !== GAS_PRICE.CUSTOM.ID) {
-      this.props.generalStore.setGasPrice(PRICE)
+    if (id !== this.props.gasPriceStore.custom.id) {
+      this.props.generalStore.setGasPrice(price)
     }
   }
 
   renderGasPriceInput() {
-    const { generalStore } = this.props
-
-    const gweiToWei = x => x * 1000000000
-    const weiToGwei = x => x / 1000000000
+    const { generalStore, gasPriceStore } = this.props
 
     return (
       <div className="right">
@@ -194,53 +210,53 @@ export class stepThree extends React.Component {
           <label className="radio-inline">
             <input
               type="radio"
-              checked={this.state.gasPriceSelected === GAS_PRICE.SLOW.ID}
+              checked={this.state.gasPriceSelected === gasPriceStore.slow.id}
               name="gas-price-option-slow"
-              onChange={() => this.setGasPrice(GAS_PRICE.SLOW)}
+              onChange={() => this.setGasPrice(gasPriceStore.slow)}
               value="slow"
             />
-            <span className="title">{GAS_PRICE.SLOW.DESCRIPTION}</span>
+            <span className="title">{gasPriceStore.slow.description()}</span>
           </label>
         </div>
         <div className="radios-inline">
           <label className="radio-inline">
             <input
               type="radio"
-              checked={this.state.gasPriceSelected === GAS_PRICE.NORMAL.ID}
+              checked={this.state.gasPriceSelected === gasPriceStore.standard.id}
               name="gas-price-option-normal"
-              onChange={() => this.setGasPrice(GAS_PRICE.NORMAL)}
+              onChange={() => this.setGasPrice(gasPriceStore.standard)}
               value="slow"
             />
-            <span className="title">{GAS_PRICE.NORMAL.DESCRIPTION}</span>
+            <span className="title">{gasPriceStore.standard.description()}</span>
           </label>
         </div>
         <div className="radios-inline">
           <label className="radio-inline">
             <input
               type="radio"
-              checked={this.state.gasPriceSelected === GAS_PRICE.FAST.ID}
+              checked={this.state.gasPriceSelected === gasPriceStore.fast.id}
               name="gas-price-option-fast"
-              onChange={() => this.setGasPrice(GAS_PRICE.FAST)}
+              onChange={() => this.setGasPrice(gasPriceStore.fast)}
               value="slow"
             />
-            <span className="title">{GAS_PRICE.FAST.DESCRIPTION}</span>
+            <span className="title">{gasPriceStore.fast.description()}</span>
           </label>
         </div>
         <div className="radios-inline">
           <label className="radio-inline">
             <input
               type="radio"
-              checked={this.state.gasPriceSelected === GAS_PRICE.CUSTOM.ID}
+              checked={this.state.gasPriceSelected === gasPriceStore.custom.id}
               name="gas-price-option-fast"
-              onChange={() => this.setGasPrice(GAS_PRICE.CUSTOM)}
+              onChange={() => this.setGasPrice(gasPriceStore.custom)}
               value="slow"
             />
-            <span className="title">{GAS_PRICE.CUSTOM.DESCRIPTION}</span>
+            <span className="title">{gasPriceStore.custom.description()}</span>
           </label>
         </div>
 
         {
-          this.state.gasPriceSelected === GAS_PRICE.CUSTOM.ID ?
+          this.state.gasPriceSelected === gasPriceStore.custom.id ?
             <input
               className="input"
               style={{ display: 'inline-block' }}
@@ -274,7 +290,7 @@ export class stepThree extends React.Component {
             type="text"
             title={WALLET_ADDRESS}
             value={tierStore.tiers[0].walletAddress}
-            valid={tierStore.validTiers[0].walletAddress}
+            valid={tierStore.validTiers[0] && tierStore.validTiers[0].walletAddress}
             errorMessage={VALIDATION_MESSAGES.WALLET_ADDRESS}
             onChange={e => this.updateTierStore(e, "walletAddress", 0)}
             description={`Where the money goes after investors transactions. Immediately after each transaction. We recommend to setup a multisig wallet with hardware based signers.`}
@@ -341,7 +357,7 @@ export class stepThree extends React.Component {
                   type="text"
                   title={CROWDSALE_SETUP_NAME}
                   value={tierStore.tiers[0].tier}
-                  valid={tierStore.validTiers[0].tier}
+                  valid={tierStore.validTiers[0] && tierStore.validTiers[0].tier}
                   errorMessage={VALIDATION_MESSAGES.TIER}
                   onChange={e => this.updateTierStore(e, "tier", 0)}
                   description={`Name of a tier, e.g. PrePreIco, PreICO, ICO with bonus A, ICO with bonus B, etc. We simplified that and will increment a number after each tier.`}
@@ -365,7 +381,7 @@ export class stepThree extends React.Component {
                   type="datetime-local"
                   title={START_TIME}
                   value={tierStore.tiers[0].startTime}
-                  valid={tierStore.validTiers[0].startTime}
+                  valid={tierStore.validTiers[0] && tierStore.validTiers[0].startTime}
                   errorMessage={VALIDATION_MESSAGES.START_TIME}
                   onChange={e => this.updateTierStore(e, "startTime", 0)}
                   description={`Date and time when the tier starts. Can't be in the past from the current moment.`}
@@ -375,7 +391,7 @@ export class stepThree extends React.Component {
                   type="datetime-local"
                   title={END_TIME}
                   value={tierStore.tiers[0].endTime}
-                  valid={tierStore.validTiers[0].endTime}
+                  valid={tierStore.validTiers[0] && tierStore.validTiers[0].endTime}
                   errorMessage={VALIDATION_MESSAGES.END_TIME}
                   onChange={e => this.updateTierStore(e, "endTime", 0)}
                   description={`Date and time when the tier ends. Can be only in the future.`}
@@ -387,7 +403,7 @@ export class stepThree extends React.Component {
                   type="number"
                   title={RATE}
                   value={tierStore.tiers[0].rate}
-                  valid={tierStore.validTiers[0].rate}
+                  valid={tierStore.validTiers[0] && tierStore.validTiers[0].rate}
                   errorMessage={VALIDATION_MESSAGES.RATE}
                   onChange={e => this.updateTierStore(e, "rate", 0)}
                   description={`Exchange rate Ethereum to Tokens. If it's 100, then for 1 Ether you can buy 100 tokens`}
@@ -397,7 +413,7 @@ export class stepThree extends React.Component {
                   type="number"
                   title={SUPPLY}
                   value={tierStore.tiers[0].supply}
-                  valid={tierStore.validTiers[0].supply}
+                  valid={tierStore.validTiers[0] && tierStore.validTiers[0].supply}
                   errorMessage={VALIDATION_MESSAGES.SUPPLY}
                   onChange={e => this.updateTierStore(e, "supply", 0)}
                   description={`How many tokens will be sold on this tier. Cap of crowdsale equals to sum of supply of all tiers`}
@@ -411,6 +427,7 @@ export class stepThree extends React.Component {
           <div>{crowdsaleBlockListStore.blockList}</div>
 
           <div className="button-container">{this.renderLink()}</div>
+          <Loader show={this.state.loading}/>
         </section>
       );
     }

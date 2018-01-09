@@ -1,6 +1,9 @@
 import { observable, action, computed } from 'mobx';
 import { VALIDATION_TYPES, defaultTiers } from '../utils/constants'
-import { validateName, validateTime, validateSupply, validateRate, validateAddress, validateLaterTime, validateLaterOrEqualTime } from '../utils/utils'
+import {
+  validateName, validateTime, validateSupply, validateRate, validateAddress, validateLaterTime,
+  validateLaterOrEqualTime, validateTier
+} from '../utils/utils'
 const { VALID, INVALID } = VALIDATION_TYPES
 class TierStore {
 
@@ -47,10 +50,17 @@ class TierStore {
     this.tiers = []
   }
 
+  @action emptyTierValidationsList = () => {
+    this.validTiers = []
+  }
+
   @action validateTiers = (property, index) => {
     switch (property){
       case 'name':
         this.validTiers[index][property] = validateName(this.tiers[index][property]) ? VALID : INVALID
+        return
+      case 'tier':
+        this.validTiers[index][property] = validateTier(this.tiers[index][property]) ? VALID : INVALID
         return
       case 'walletAddress':
         this.validTiers[index][property] = validateAddress(this.tiers[index][property]) ? VALID : INVALID
@@ -74,6 +84,49 @@ class TierStore {
       default:
         // do nothing
     }
+  }
+
+  @action validateEditedTier = (property, index) => {
+    switch (property) {
+      case 'endTime':
+        let lessThanNextStart = true
+        const laterTime = validateLaterTime(this.tiers[index][property], this.tiers[index].startTime)
+
+        if (index < this.tiers.length - 1) {
+          lessThanNextStart = validateLaterOrEqualTime(this.tiers[index + 1].startTime, this.tiers[index][property])
+        }
+
+        this.validTiers[index][property] = lessThanNextStart && laterTime ? VALID : INVALID
+        return
+      case 'startTime':
+        let notLaterTime = true
+        const previousToEndTime = validateLaterTime(this.tiers[index].endTime, this.tiers[index][property])
+        const validTime = validateTime(this.tiers[index][property])
+
+        if (index > 0) {
+          notLaterTime = validateLaterOrEqualTime(this.tiers[index][property], this.tiers[index - 1].endTime)
+        }
+
+        this.validTiers[index][property] = notLaterTime && previousToEndTime && validTime ? VALID : INVALID
+        return
+      default:
+        return
+    }
+  }
+
+  @action validateEditedEndTime = index => {
+    if (this.tiers.length) {
+      if (index < this.tiers.length - 1) {
+        this.validTiers[index].endTime = validateLaterOrEqualTime(this.tiers[index + 1].startTime, this.tiers[index].endTime) ? VALID : INVALID
+      }
+    }
+  }
+
+  @computed
+  get individuallyValidTiers () {
+    if (!this.validTiers) return
+
+    return this.validTiers.map((tier, index) => Object.keys(tier).every(key => this.validTiers[index][key] === VALID))
   }
 
   @computed get areTiersValid() {

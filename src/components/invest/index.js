@@ -8,12 +8,13 @@ import {
   getCrowdsaleData,
   getCrowdsaleTargetDates,
   getCurrentRate,
-  getJoinedTiers
+  getJoinedTiers,
+  initializeAccumulativeData
 } from '../crowdsale/utils'
 import { getQueryVariable, getURLParam, getWhiteListWithCapCrowdsaleAssets, toast } from '../../utils/utils'
 import {
   invalidCrowdsaleAddrAlert,
-  investmentDisabledAlertInTime,
+  investmentDisabledAlertInTime, noGasPriceAvailable,
   noMetaMaskAlert,
   successfulInvestmentAlert
 } from '../../utils/alerts'
@@ -23,7 +24,7 @@ import { CONTRACT_TYPES, INVESTMENT_OPTIONS, TOAST } from '../../utils/constants
 import { inject, observer } from 'mobx-react'
 import QRPaymentProcess from './QRPaymentProcess'
 
-@inject('contractStore', 'crowdsalePageStore', 'web3Store', 'tierStore', 'tokenStore', 'generalStore', 'investStore')
+@inject('contractStore', 'crowdsalePageStore', 'web3Store', 'tierStore', 'tokenStore', 'generalStore', 'investStore', 'gasPriceStore', 'generalStore')
 @observer
 export class Invest extends React.Component {
   constructor(props) {
@@ -41,7 +42,7 @@ export class Invest extends React.Component {
   }
 
   componentDidMount () {
-    const { web3Store, contractStore } = this.props
+    const { web3Store, contractStore, gasPriceStore, generalStore } = this.props
     const { web3 } = web3Store
 
     if (!web3) {
@@ -65,6 +66,9 @@ export class Invest extends React.Component {
       .then(_newState => {
         this.setState(_newState)
         this.extractContractsData(web3)
+        gasPriceStore.updateValues()
+          .then(() => generalStore.setGasPrice(gasPriceStore.slow.price))
+          .catch(() => noGasPriceAvailable())
       })
   }
 
@@ -106,7 +110,8 @@ export class Invest extends React.Component {
             return
           }
 
-          getCrowdsaleData(web3, crowdsaleContract)
+          initializeAccumulativeData()
+            .then(() => getCrowdsaleData(web3, crowdsaleContract))
             .then(() => getAccumulativeCrowdsaleData.call(this, web3, () => Promise.resolve()))
             .then(() => this.setState({ loading: false }))
             .catch(err => {
@@ -209,7 +214,13 @@ export class Invest extends React.Component {
     }
     console.log(opts)
 
-    sendTXToContract(web3, crowdsaleContract.methods.buy().send(opts))
+    crowdsaleContract.methods.buy().estimateGas(opts)
+      .then(estimatedGas => {
+        const estimatedGasMax = 4016260
+        opts.gasLimit = !estimatedGas || estimatedGas > estimatedGasMax ? estimatedGasMax : estimatedGas + 100000
+
+        return sendTXToContract(web3, crowdsaleContract.methods.buy().send(opts))
+      })
       .then(() => successfulInvestmentAlert(investStore.tokensToInvest))
       .catch(err => toast.showToaster({ type: TOAST.TYPE.ERROR, message: TOAST.MESSAGE.TRANSACTION_FAILED }))
       .then(() => this.setState({ loading: false }))

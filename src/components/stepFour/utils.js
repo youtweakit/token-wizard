@@ -129,7 +129,7 @@ function addWhiteList (round, web3, tierStore, token, abi, addr) {
       console.log('statuses:', minCaps)
       console.log('maxCaps:', maxCaps)
 
-      const method = crowdsaleContract.methods.setEarlyParicipantsWhitelist(addrs, statuses, minCaps, maxCaps).send({
+      const method = crowdsaleContract.methods.setEarlyParticipantsWhitelist(addrs, statuses, minCaps, maxCaps).send({
         gasPrice: generalStore.gasPrice
       })
 
@@ -296,9 +296,10 @@ export function  setMintAgentRecursive (web3, abi, addr, crowdsaleAddrs, gasLimi
 }
 
 export function updateJoinedCrowdsalesRecursive (web3, abi, addrs, gasLimit) {
-  return addrs.reduce((promise, addr) => {
-    return promise.then(() => updateJoinedCrowdsales(web3, abi, addr, addrs, gasLimit))
-  }, Promise.resolve())
+  return addrs.reduce((promise, addr) =>
+    promise.then(() => updateJoinedCrowdsales(web3, abi, addr, addrs, gasLimit)),
+    Promise.resolve()
+  )
 }
 
 export function addWhiteListRecursive (web3, tierStore, token, abi, crowdsaleAddrs) {
