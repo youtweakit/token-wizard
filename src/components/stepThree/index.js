@@ -1,7 +1,7 @@
 import React from "react";
 import "../../assets/stylesheets/application.css";
 import { Link } from "react-router-dom";
-import { setExistingContractParams, getNetworkVersion } from "../../utils/blockchainHelpers";
+import { setExistingContractParams, getNetworkVersion, getNetWorkNameById } from "../../utils/blockchainHelpers";
 import { defaultCompanyStartDate } from "./utils";
 import { defaultCompanyEndDate, gweiToWei, weiToGwei } from "../../utils/utils";
 import { StepNavigation } from "../Common/StepNavigation";
@@ -9,17 +9,17 @@ import { InputField } from "../Common/InputField";
 import { RadioInputField } from "../Common/RadioInputField";
 import { CrowdsaleBlock } from "./CrowdsaleBlock";
 import { WhitelistInputBlock } from "../Common/WhitelistInputBlock";
-import { web3Store } from '../../stores'
 import {
   NAVIGATION_STEPS,
   VALIDATION_MESSAGES,
   VALIDATION_TYPES,
   TEXT_FIELDS,
-  CONTRACT_TYPES
+  CONTRACT_TYPES,
+  CHAINS
 } from "../../utils/constants";
 import { inject, observer } from "mobx-react";
 import { Loader } from '../Common/Loader'
-import { noGasPriceAvailable, mainnetIsOnMaintenance } from '../../utils/alerts'
+import { noGasPriceAvailable, warningOnMainnetAlert, mainnetIsOnMaintenance } from '../../utils/alerts'
 
 const { CROWDSALE_SETUP } = NAVIGATION_STEPS;
 const { EMPTY, VALID } = VALIDATION_TYPES;
@@ -35,7 +35,7 @@ const {
   DISABLEWHITELISTING
 } = TEXT_FIELDS;
 
-@inject("contractStore", "crowdsaleBlockListStore", "pricingStrategyStore", "web3Store", "tierStore", "generalStore", "gasPriceStore")
+@inject("contractStore", "crowdsaleBlockListStore", "pricingStrategyStore", "web3Store", "tierStore", "generalStore", "gasPriceStore", "reservedTokenStore")
 @observer
 export class stepThree extends React.Component {
   constructor(props) {
@@ -95,8 +95,6 @@ export class stepThree extends React.Component {
 
     tierStore.addTier(newTier);
     tierStore.addTierValidations(newTierValidations);
-    //newState.crowdsale[num].startTime = newState.crowdsale[num - 1].endTime;
-    //newState.crowdsale[num].endTime = defaultCompanyEndDate(newState.crowdsale[num].startTime);
     this.addCrowdsaleBlock(num);
   }
 
@@ -120,10 +118,8 @@ export class stepThree extends React.Component {
     pricingStrategyStore.setStrategyProperty(value, property, index);
   };
 
-  gotoDeploymentStage() {
-    this.setState({
-      redirect: true
-    });
+  goToDeploymentStage = () => {
+    this.props.history.push('/4')
   }
 
   addCrowdsaleBlock(num) {
@@ -160,15 +156,32 @@ export class stepThree extends React.Component {
     }
 
     if (tierStore.areTiersValid) {
-      web3Store.getWeb3((web3) => {
-        getNetworkVersion(web3Store.web3)
-          .then((networkId) => {
-            if (networkId == 1)
-              mainnetIsOnMaintenance();
-            else
-              this.props.history.push("/4");
-          })
-      });
+      getNetworkVersion()
+        .then(networkID => {
+          if (getNetWorkNameById(networkID) === CHAINS.MAINNET) {
+            const { generalStore, reservedTokenStore } = this.props
+
+            const tiersCount = tierStore.tiers.length
+            const priceSelected = generalStore.gasPrice
+            const reservedCount = reservedTokenStore.tokens.length
+            let whitelistCount = 0
+
+            if (tierStore.tiers[0].whitelistdisabled === 'no') {
+              whitelistCount = tierStore.tiers.reduce((total, tier) => {
+                total += tier.whitelist.filter(address => !address.deleted).length
+                return total
+              }, 0)
+            }
+
+            //return warningOnMainnetAlert(tiersCount, priceSelected, reservedCount, whitelistCount, this.goToDeploymentStage)
+            return mainnetIsOnMaintenance()
+          }
+          this.goToDeploymentStage()
+        })
+        .catch(error => {
+          console.error(error)
+          this.showErrorMessages(e)
+        })
     } else {
       this.showErrorMessages(e);
     }
@@ -182,11 +195,9 @@ export class stepThree extends React.Component {
     tierStore.setTierProperty(defaultCompanyEndDate(tierStore.tiers[0].startTime), "endTime", 0);
 
     gasPriceStore.updateValues()
+      .then(() => this.setGasPrice(gasPriceStore.slow))
+      .catch(() => noGasPriceAvailable())
       .then(() => this.setState({ loading: false }))
-      .catch(() => {
-        this.setState({ loading: false })
-        noGasPriceAvailable()
-      })
   }
 
   setGasPrice({ id, price }) {
