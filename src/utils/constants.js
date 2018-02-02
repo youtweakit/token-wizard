@@ -73,6 +73,8 @@ export const DEPLOYMENT_VALUES = {
   }
 }
 
+export const MAX_GAS_PRICE = 4016260
+
 export const GAS_PRICE = {
   SLOW: {
     ID: 'slow',
@@ -111,7 +113,8 @@ export const CHAINS = {
   ROPSTEN: 'Ropsten',
   RINKEBY: 'Rinkeby',
   KOVAN: 'Kovan',
-  ORACLES: 'Oracles dev test'
+  SOKOL: 'Sokol',
+  CORE: 'Core_POA'
 }
 
 export const NAVIGATION_STEPS = {
@@ -126,7 +129,7 @@ export const NAVIGATION_STEPS = {
 export const VALIDATION_MESSAGES = {
   TIER: 'Please enter a valid tier name between 1-30 characters',
   NAME: 'Please enter a valid name between 1-30 characters',
-  TICKER: 'Please enter a valid Ticker that is less than three characters',
+  TICKER: 'Please enter a valid Ticker that is less or equal than five characters',
   SUPPLY: 'Please enter a valid number greater than 0',
   DECIMALS: 'Please enter a number between zero and 18',
   WALLET_ADDRESS: 'Please enter a valid address',
@@ -136,6 +139,11 @@ export const VALIDATION_MESSAGES = {
   EDITED_END_TIME: 'Please enter a valid date later than start time and previous than start time of next tier',
   EDITED_START_TIME: 'Please enter a valid date later than now, less than end time and later than the end time of the previous tier',
   RATE: 'Please enter a valid number greater than 0'
+}
+
+//descriptions of input fields
+export const DESCRIPTION = {
+  TOKEN_TICKER: 'The five letter ticker for your token.'
 }
 
 export const TEXT_FIELDS = {
@@ -156,7 +164,7 @@ export const TEXT_FIELDS = {
   VALUE: 'Value',
   MAX_CAP: 'Max cap',
   ALLOWMODIFYING: 'Allow modifying',
-  DISABLEWHITELISTING: 'Disable whitelisting',
+  ENABLE_WHITELISTING: 'Enable whitelisting',
   GAS_PRICE: 'Gas Price'
 }
 
@@ -390,11 +398,30 @@ export const TOAST = {
     TRANSACTION_FAILED: 'Transaction has failed, please retry',
     CONTRACT_DOWNLOAD_FAILED: 'Contract Download failed',
     CONTRACT_DOWNLOAD_SUCCESS: 'A file with contracts and metadata downloaded on your computer',
-    FINALIZE_FAIL: 'Was not able to finalize Crowdsale. Please be sure that Crowdsale has ended already'
+    FINALIZE_FAIL: 'Was not able to finalize Crowdsale. Please be sure that Crowdsale has ended already',
+    DISTRIBUTE_FAIL: 'Was not able to distribute reserved tokens'
   },
   DEFAULT_OPTIONS: {
     position: 'top right',
     offset: 80,
     time: 10000
   }
+}
+
+export const TX_STEP_DESCRIPTION = {
+  safeMathLibrary: "Deploy SafeMathLibrary Contract",
+  token: "Deploy Token Contract",
+  pricingStrategy: "Deploy Pricing Strategy Contract",
+  crowdsale: "Deploy Crowdsale Contract",
+  registerCrowdsaleAddress: "Associate Crowdsale address to current account",
+  finalizeAgent: "Deploy Finalize Agent Contract",
+  tier: "Register tier address for Pricing strategy",
+  setReservedTokens: "Register addresses for Reserved Tokens",
+  updateJoinedCrowdsales: "Register Crowdsales addresses",
+  setMintAgentCrowdsale: "Allow Crowdsale Contract to Mint Tokens",
+  setMintAgentFinalizeAgent: "Allow Finalize Agent Contract to Mint Token",
+  whitelist: "Register whitelisted addresses",
+  setFinalizeAgent: "Register Finalize Agent Contract addresses",
+  setReleaseAgent: "Register Token release addresses",
+  transferOwnership: "Transfer ownership to wallet address"
 }

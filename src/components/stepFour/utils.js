@@ -1,17 +1,19 @@
 import {
+  calculateGasLimit,
   attachToContract,
   getNetWorkNameById,
   getNetworkVersion,
-  sendTXToContract
+  sendTXToContract,
+  getRegistryAddress
 } from '../../utils/blockchainHelpers'
 import { noContractAlert } from '../../utils/alerts'
 import { toFixed } from '../../utils/utils'
 import { DOWNLOAD_NAME } from '../../utils/constants'
 import { isObservableArray } from 'mobx'
-import { generalStore } from '../../stores'
+import { generalStore, deploymentStore, contractStore, web3Store } from '../../stores'
 
-function setLastCrowdsale (abi, addr, lastCrowdsale, gasLimit) {
-  console.log('###setLastCrowdsale for Pricing Strategy:###')
+function setTier (abi, addr, tier) {
+  console.log('###setTier for Pricing Strategy:###')
 
   return attachToContract(abi, addr)
     .then(pricingStrategyContract => {
@@ -22,17 +24,19 @@ function setLastCrowdsale (abi, addr, lastCrowdsale, gasLimit) {
         return Promise.reject('No contract available')
       }
 
-      const method = pricingStrategyContract.methods.setLastCrowdsale(lastCrowdsale).send({
-        gasLimit: gasLimit,
-        gasPrice: generalStore.gasPrice
-      })
+      const opts = { gasPrice: generalStore.gasPrice }
+      const method = pricingStrategyContract.methods.setTier(tier)
 
-      return sendTXToContract(method)
+      return method.estimateGas(opts)
+        .then(estimatedGas => {
+          opts.gasLimit = calculateGasLimit(estimatedGas)
+          return sendTXToContract(method.send(opts))
+        })
     })
 }
 
 //for mintable token
-function setMintAgent (abi, addr, acc, gasLimit) {
+function setMintAgent (abi, addr, acc) {
   console.log('###setMintAgent:###')
 
   return attachToContract(abi, addr)
@@ -44,12 +48,14 @@ function setMintAgent (abi, addr, acc, gasLimit) {
         return Promise.reject('No contract available')
       }
 
-      const method = tokenContract.methods.setMintAgent(acc, true).send({
-        gasLimit: gasLimit,
-        gasPrice: generalStore.gasPrice
-      })
+      const opts = { gasPrice: generalStore.gasPrice }
+      const method = tokenContract.methods.setMintAgent(acc, true)
 
-      return sendTXToContract(method)
+      return method.estimateGas(opts)
+        .then(estimatedGas => {
+          opts.gasLimit = calculateGasLimit(estimatedGas)
+          return sendTXToContract(method.send(opts))
+        })
     })
 }
 
@@ -129,15 +135,18 @@ function addWhiteList (round, tierStore, token, abi, addr) {
       console.log('statuses:', minCaps)
       console.log('maxCaps:', maxCaps)
 
-      const method = crowdsaleContract.methods.setEarlyParticipantsWhitelist(addrs, statuses, minCaps, maxCaps).send({
-        gasPrice: generalStore.gasPrice
-      })
+      const opts = { gasPrice: generalStore.gasPrice }
+      const method = crowdsaleContract.methods.setEarlyParticipantWhitelistMultiple(addrs, statuses, minCaps, maxCaps)
 
-      return sendTXToContract(method)
+      return method.estimateGas(opts)
+        .then(estimatedGas => {
+          opts.gasLimit = calculateGasLimit(estimatedGas)
+          return sendTXToContract(method.send(opts))
+        })
     })
 }
 
-function updateJoinedCrowdsales (abi, addr, joinedContractAddresses, gasLimit) {
+function updateJoinedCrowdsales (abi, addr, joinedContractAddresses) {
   console.log('###updateJoinedCrowdsales:###')
 
   return attachToContract(abi, addr)
@@ -151,16 +160,18 @@ function updateJoinedCrowdsales (abi, addr, joinedContractAddresses, gasLimit) {
 
       console.log('input:', joinedContractAddresses)
 
-      let method = crowdsaleContract.methods.updateJoinedCrowdsalesMultiple(joinedContractAddresses).send({
-        gasLimit: gasLimit,
-        gasPrice: generalStore.gasPrice
-      })
+      const opts = { gasPrice: generalStore.gasPrice }
+      const method = crowdsaleContract.methods.updateJoinedCrowdsalesMultiple(joinedContractAddresses)
 
-      return sendTXToContract(method)
+      return method.estimateGas(opts)
+        .then(estimatedGas => {
+          opts.gasLimit = calculateGasLimit(estimatedGas)
+          return sendTXToContract(method.send(opts))
+        })
     })
 }
 
-function setFinalizeAgent (abi, addr, finalizeAgentAddr, gasLimit) {
+function setFinalizeAgent (abi, addr, finalizeAgentAddr) {
   console.log('###setFinalizeAgent:###')
 
   return attachToContract(abi, addr)
@@ -172,16 +183,18 @@ function setFinalizeAgent (abi, addr, finalizeAgentAddr, gasLimit) {
         return Promise.reject('No contract available')
       }
 
-      const method = crowdsaleContract.methods.setFinalizeAgent(finalizeAgentAddr).send({
-        gasLimit: gasLimit,
-        gasPrice: generalStore.gasPrice
-      })
+      const opts = { gasPrice: generalStore.gasPrice }
+      const method = crowdsaleContract.methods.setFinalizeAgent(finalizeAgentAddr)
 
-      return sendTXToContract(method)
+      return method.estimateGas(opts)
+        .then(estimatedGas => {
+          opts.gasLimit = calculateGasLimit(estimatedGas)
+          return sendTXToContract(method.send(opts))
+        })
     })
 }
 
-function setReleaseAgent (abi, addr, finalizeAgentAddr, gasLimit) {
+function setReleaseAgent (abi, addr, finalizeAgentAddr) {
   console.log('###setReleaseAgent:###')
 
   return attachToContract(abi, addr)
@@ -193,12 +206,14 @@ function setReleaseAgent (abi, addr, finalizeAgentAddr, gasLimit) {
         return Promise.reject('No contract available')
       }
 
-      const method = tokenContract.methods.setReleaseAgent(finalizeAgentAddr).send({
-        gasLimit: gasLimit,
-        gasPrice: generalStore.gasPrice
-      })
+      const opts = { gasPrice: generalStore.gasPrice }
+      const method = tokenContract.methods.setReleaseAgent(finalizeAgentAddr)
 
-      return sendTXToContract(method)
+      return method.estimateGas(opts)
+        .then(estimatedGas => {
+          opts.gasLimit = calculateGasLimit(estimatedGas)
+          return sendTXToContract(method.send(opts))
+        })
     })
 }
 
@@ -254,15 +269,20 @@ export function setReservedTokensListMultiple (abi, addr, token, reservedTokenSt
         if (inPercentageDecimals.length === 0) return Promise.resolve()
       }
 
-      let method = tokenContract.methods
+      const opts = { gasPrice: generalStore.gasPrice }
+      const method = tokenContract.methods
         .setReservedTokensListMultiple(addrs, inTokens, inPercentageUnit, inPercentageDecimals)
-        .send({ gasPrice: generalStore.gasPrice })
 
-      return sendTXToContract(method)
+      return method.estimateGas(opts)
+        .then(estimatedGas => {
+          opts.gasLimit = calculateGasLimit(estimatedGas)
+          return sendTXToContract(method.send(opts))
+        })
+        .then(() => deploymentStore.setAsSuccessful('setReservedTokens'))
     })
 }
 
-export function transferOwnership (abi, addr, finalizeAgentAddr, gasLimit) {
+export function transferOwnership (abi, addr, finalizeAgentAddr) {
   console.log('###transferOwnership:###')
 
   return attachToContract(abi, addr)
@@ -274,49 +294,94 @@ export function transferOwnership (abi, addr, finalizeAgentAddr, gasLimit) {
         return Promise.reject('No contract available')
       }
 
-      const method = tokenContract.methods.transferOwnership(finalizeAgentAddr).send({
-        gasLimit: gasLimit,
-        gasPrice: generalStore.gasPrice
-      })
+      const opts = { gasPrice: generalStore.gasPrice }
+      const method = tokenContract.methods.transferOwnership(finalizeAgentAddr)
 
-      return sendTXToContract(method)
+      return method.estimateGas(opts)
+        .then(estimatedGas => {
+          opts.gasLimit = calculateGasLimit(estimatedGas)
+          return sendTXToContract(method.send(opts))
+        })
+        .then(() => deploymentStore.setAsSuccessful('transferOwnership'))
     })
 }
 
-export function setLastCrowdsaleRecursive (abi, pricingStrategyAddrs, lastCrowdsale, gasLimit) {
-  return pricingStrategyAddrs.reduce((promise, pricingStrategyAddr) => {
-    return promise.then(() => setLastCrowdsale(abi, pricingStrategyAddr, lastCrowdsale, gasLimit))
+export function registerCrowdsaleAddress () {
+  console.log('###registerCrowdsaleAddress:###')
+  const { web3 } = web3Store
+  const toJS = x => JSON.parse(JSON.stringify(x))
+
+  const registryAbi = contractStore.registry.abi
+  const crowdsaleAddress = contractStore.crowdsale.addr[0]
+
+  const whenRegistryAddress = getRegistryAddress()
+
+  const whenAccount = web3.eth.getAccounts()
+    .then((accounts) => accounts[0])
+
+  return Promise.all([whenRegistryAddress, whenAccount])
+    .then(([registryAddress, account]) => {
+      const registry = new web3.eth.Contract(toJS(registryAbi), registryAddress)
+
+
+      const opts = { gasPrice: generalStore.gasPrice, from: account }
+      const method = registry.methods.add(crowdsaleAddress)
+
+      return method.estimateGas(opts)
+        .then(estimatedGas => {
+          opts.gasLimit = calculateGasLimit(estimatedGas)
+          return sendTXToContract(method.send(opts))
+        })
+    })
+
+    .then(() => deploymentStore.setAsSuccessful('registerCrowdsaleAddress'))
+}
+
+export function setTierRecursive (abi, pricingStrategyAddrs, tiers) {
+  return pricingStrategyAddrs.reduce((promise, pricingStrategyAddr, index) => {
+    return promise
+      .then(() => setTier(abi, pricingStrategyAddr, tiers[index]))
+      .then(() => deploymentStore.setAsSuccessful('tier'))
   }, Promise.resolve())
 }
 
-export function setMintAgentRecursive (abi, addr, crowdsaleAddrs, gasLimit) {
+export function setMintAgentRecursive (abi, addr, crowdsaleAddrs, txName) {
   return crowdsaleAddrs.reduce((promise, crowdsaleAddr) => {
-    return promise.then(() => setMintAgent(abi, addr, crowdsaleAddr, gasLimit))
+    return promise
+      .then(() => setMintAgent(abi, addr, crowdsaleAddr))
+      .then(() => deploymentStore.setAsSuccessful(txName))
   }, Promise.resolve())
 }
 
-export function updateJoinedCrowdsalesRecursive (abi, addrs, gasLimit) {
-  return addrs.reduce((promise, addr) =>
-      promise.then(() => updateJoinedCrowdsales(abi, addr, addrs, gasLimit)),
-    Promise.resolve()
-  )
+export function updateJoinedCrowdsalesRecursive (abi, addrs) {
+  return addrs.reduce((promise, addr) => {
+    return promise
+      .then(() => updateJoinedCrowdsales(abi, addr, addrs))
+      .then(() => deploymentStore.setAsSuccessful('updateJoinedCrowdsales'))
+  }, Promise.resolve())
 }
 
 export function addWhiteListRecursive (tierStore, token, abi, crowdsaleAddrs) {
   return crowdsaleAddrs.reduce((promise, crowdsaleAddr, index) => {
-    return promise.then(() => addWhiteList(index, tierStore, token, abi, crowdsaleAddr))
+    return promise
+      .then(() => addWhiteList(index, tierStore, token, abi, crowdsaleAddr))
+      .then(() => deploymentStore.setAsSuccessful('whitelist'))
   }, Promise.resolve())
 }
 
-export function setFinalizeAgentRecursive (abi, addrs, finalizeAgentAddrs, gasLimit) {
+export function setFinalizeAgentRecursive (abi, addrs, finalizeAgentAddrs) {
   return finalizeAgentAddrs.reduce((promise, finalizeAgentAddr, index) => {
-    return promise.then(() => setFinalizeAgent(abi, addrs[index], finalizeAgentAddr, gasLimit))
+    return promise
+      .then(() => setFinalizeAgent(abi, addrs[index], finalizeAgentAddr))
+      .then(() => deploymentStore.setAsSuccessful('setFinalizeAgent'))
   }, Promise.resolve())
 }
 
-export function setReleaseAgentRecursive (abi, addr, finalizeAgentAddrs, gasLimit) {
+export function setReleaseAgentRecursive (abi, addr, finalizeAgentAddrs) {
   return finalizeAgentAddrs.reduce((promise, finalizeAgentAddr) => {
-    return promise.then(() => setReleaseAgent(abi, addr, finalizeAgentAddr, gasLimit))
+    return promise
+      .then(() => setReleaseAgent(abi, addr, finalizeAgentAddr))
+      .then(() => deploymentStore.setAsSuccessful('setReleaseAgent'))
   }, Promise.resolve())
 }
 

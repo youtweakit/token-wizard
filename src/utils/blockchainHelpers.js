@@ -1,7 +1,8 @@
 import { incorrectNetworkAlert, noMetaMaskAlert, invalidNetworkIDAlert } from './alerts'
-import { CHAINS } from './constants'
-import { crowdsaleStore, generalStore, web3Store } from '../stores'
+import { CHAINS, MAX_GAS_PRICE } from './constants'
+import { crowdsaleStore, generalStore, web3Store, contractStore } from '../stores'
 import { fetchFile } from './utils'
+import deploymentStore from '../stores/DeploymentStore'
 
 const DEPLOY_CONTRACT = 1
 const CALL_METHOD = 2
@@ -64,11 +65,17 @@ export function getNetWorkNameById (_id) {
       return CHAINS.RINKEBY
     case 42:
       return CHAINS.KOVAN
-    case 12648430:
-      return CHAINS.ORACLES
+    case 77:
+      return CHAINS.SOKOL
+    case 99:
+      return CHAINS.CORE
     default:
       return null
   }
+}
+
+export const calculateGasLimit = (estimatedGas = 0) => {
+  return !estimatedGas || estimatedGas > MAX_GAS_PRICE ? MAX_GAS_PRICE : estimatedGas + 100000
 }
 
 export function getNetworkVersion () {
@@ -116,26 +123,23 @@ const deployContractInner = (accounts, abi, deployOpts) => {
   console.log('abi', abi)
 
   const { web3 } = web3Store
-  const estimatedGasMax = 4016260
   const objAbi = JSON.parse(JSON.stringify(abi))
   const contractInstance = new web3.eth.Contract(objAbi)
+  const deploy = contractInstance.deploy(deployOpts)
 
-  return contractInstance.deploy(deployOpts).estimateGas({ gas: estimatedGasMax })
+  return deploy.estimateGas({ gas: MAX_GAS_PRICE })
     .then(
       estimatedGas => estimatedGas,
       err => console.log('errrrrrrrrrrrrrrrrr', err)
     )
     .then(estimatedGas => {
       console.log('gas is estimated', estimatedGas)
-      const gas = !estimatedGas || estimatedGas > estimatedGasMax ? estimatedGasMax : estimatedGas + 100000
       const sendOpts = {
         from: accounts[0],
         gasPrice: generalStore.gasPrice,
-        gas
+        gas: calculateGasLimit(estimatedGas)
       }
-      const method = contractInstance.deploy(deployOpts).send(sendOpts)
-
-      return sendTX(method, DEPLOY_CONTRACT)
+      return sendTX(deploy.send(sendOpts), DEPLOY_CONTRACT)
     })
 }
 
@@ -161,7 +165,7 @@ let sendTX = (method, type) => {
       // This additional polling of tx receipt was made, because users had problems on mainnet: wizard hanged on random
       // transaction, because there wasn't response from it, no receipt. Especially, if you switch between tabs when
       // wizard works.
-      // https://github.com/oraclesorg/ico-wizard/pull/364/files/c86c3e8482ef078e0cb46b8bebf57a9187f32181#r152277434
+      // https://github.com/poanetwork/ico-wizard/pull/364/files/c86c3e8482ef078e0cb46b8bebf57a9187f32181#r152277434
       .on('transactionHash', _txHash => checkTxMined(_txHash, function pollingReceiptCheck (err, receipt) {
         if (isMined) return
         //https://github.com/poanetwork/ico-wizard/issues/480
@@ -248,43 +252,13 @@ export function attachToContract (abi, addr) {
     })
 }
 
-function getRegistryAddress () {
+export function getRegistryAddress () {
   const { web3 } = web3Store
 
   return web3.eth.net.getId()
     .then(networkId => {
       const registryAddressMap = JSON.parse(process.env['REACT_APP_REGISTRY_ADDRESS'] || '{}')
       return registryAddressMap[networkId]
-    })
-}
-
-export function registerCrowdsaleAddress (contractStore) {
-  const { web3 } = web3Store
-  const toJS = x => JSON.parse(JSON.stringify(x))
-
-  const registryAbi = contractStore.registry.abi
-  const crowdsaleAddress = contractStore.crowdsale.addr[0]
-
-  const whenRegistryAddress = getRegistryAddress()
-
-  const whenAccount = web3.eth.getAccounts()
-    .then((accounts) => accounts[0])
-
-  return Promise.all([whenRegistryAddress, whenAccount])
-    .then(([registryAddress, account]) => {
-      const registry = new web3.eth.Contract(toJS(registryAbi), registryAddress)
-      const opts = { from: account }
-
-      return registry.methods
-        .add(crowdsaleAddress)
-        .estimateGas(opts)
-        .then(estimatedGas => {
-          opts.gasLimit = 100000
-
-          return registry.methods
-            .add(crowdsaleAddress)
-            .send(opts)
-        })
     })
 }
 

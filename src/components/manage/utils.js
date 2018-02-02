@@ -25,7 +25,7 @@ export const updateTierAttribute = (attribute, value, addresses) => {
     endTime: 'setEndsAt',
     supply: 'setMaximumSellableTokens',
     rate: 'updateRate',
-    whitelist: 'setEarlyParticipantsWhitelist'
+    whitelist: 'setEarlyParticipantWhitelistMultiple'
   }
   let abi
   let contractAddresses
@@ -51,8 +51,8 @@ export const updateTierAttribute = (attribute, value, addresses) => {
   }
 
   if (attribute === 'rate') {
-    abi = contractStore.pricingStrategy.abi
-    contractAddresses = [addresses.pricingStrategyAddress]
+    abi = contractStore.crowdsale.abi
+    contractAddresses = [addresses.crowdsaleAddress]
     const oneTokenInETH = floorToDecimals(TRUNC_TO_DECIMALS.DECIMALS18, 1 / Number(value))
     value = [web3Store.web3.utils.toWei(oneTokenInETH, 'ether')]
   }
@@ -244,7 +244,7 @@ export const processTier = (crowdsaleAddress, crowdsaleNum) => {
       }
 
       if (crowdsaleNum === 0) {
-        newTier.whitelistdisabled = !isWhitelisted ? 'yes' : 'no'
+        newTier.whitelistEnabled = isWhitelisted ? 'yes' : 'no'
       }
 
       return Promise.all([pricingStrategyAddress, maximumSellableTokens, whitelistAccounts, tokenData(tokenAddress)])
@@ -322,5 +322,43 @@ export const processTier = (crowdsaleAddress, crowdsaleNum) => {
         initialValues.whitelistElements = whitelistElements
       }
       crowdsaleStore.addInitialTierValues(initialValues)
+    })
+}
+
+const setCurrentContract = (contract, index) => {
+  const currentDate = new Date().getTime()
+  const { startDate, endDate } = contract
+  const isActive = startDate <= currentDate && currentDate <= endDate
+  const isFirstTier = index === 0
+
+  if (isActive || (isFirstTier && currentDate < startDate)) {
+    contract.current = true
+  }
+
+  return contract
+}
+
+export const contractsInfo = () => {
+  const whenContracts = contractStore.crowdsale.addr
+    .map(address => attachToContract(contractStore.crowdsale.abi, address)
+      .then(contract => {
+        const whenStartDate = contract.methods.startsAt().call()
+        const whenEndDate = contract.methods.endsAt().call()
+
+        return Promise.all([whenStartDate, whenEndDate])
+          .then(([startDate, endDate]) => ({
+            address,
+            startDate: startDate * 1000,
+            endDate: endDate * 1000,
+            contract,
+            current: false
+          }))
+      }))
+
+  return Promise.all(whenContracts)
+    .then(contracts => {
+      return contracts
+        .sort((previous, current) => previous.endDate > current.endDate)
+        .map(setCurrentContract)
     })
 }

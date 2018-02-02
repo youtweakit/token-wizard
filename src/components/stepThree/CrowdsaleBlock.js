@@ -61,13 +61,10 @@ export class CrowdsaleBlock extends React.Component {
               description={`Name of a tier, e.g. PrePreIco, PreICO, ICO with bonus A, ICO with bonus B, etc. We simplified that and will increment a number after each tier.`}
             />
             <RadioInputField
-              side="right"
+              extraClassName="right"
               title={ALLOWMODIFYING}
-              items={["on", "off"]}
-              vals={["on", "off"]}
-              num={num}
-              defaultValue={this.props.tierStore.tiers[num].updatable}
-              name={"crowdsale-updatable-" + num}
+              items={[{ label: 'on', value: 'on' }, { label: 'off', value: 'off' }]}
+              selectedItem={this.props.tierStore.tiers[this.props.num].updatable}
               onChange={e => this.updateTierStore(e, "updatable")}
               description={`Pandora box feature. If it's enabled, a creator of the crowdsale can modify Start time, End time, Rate, Limit after publishing.`}
             />
@@ -117,7 +114,7 @@ export class CrowdsaleBlock extends React.Component {
             />
           </div>
         </div>
-        {tierStore.tiers[0].whitelistdisabled === "yes" ? "" : whitelistInputBlock}
+        {tierStore.tiers[0].whitelistEnabled === "yes" ? whitelistInputBlock : ""}
       </div>
     );
   }

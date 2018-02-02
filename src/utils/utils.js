@@ -1,43 +1,10 @@
 import { VALIDATION_TYPES, TRUNC_TO_DECIMALS, TOAST } from './constants'
 import { contractStore, tokenStore, tierStore, web3Store } from '../stores'
+import queryString from 'query-string'
 const { VALID, INVALID } = VALIDATION_TYPES
 
 export function getQueryVariable(variable) {
-  var query = window.location.search.substring(1);
-  var vars = query.split('&');
-  for (var i = 0; i < vars.length; i++) {
-    var pair = vars[i].split('=');
-    if (decodeURIComponent(pair[0]) === variable) {
-      return decodeURIComponent(pair[1]);
-    }
-  }
-}
-
-export function getURLParam(key,target){
-  var values = [];
-  if(!target) {
-    target = window.location.href;
-  }
-
-  key = key.replace(/[[]/, "\\[").replace(/[\]]/, "\\]");
-
-  var pattern = key + '=([^&#]+)';
-  var o_reg = new RegExp(pattern,'ig');
-  while (true) {
-    var matches = o_reg.exec(target);
-    if(matches && matches[1]) {
-      values.push(matches[1]);
-    }
-    else {
-      break;
-    }
-  }
-
-  if (!values.length) {
-    return null;
-  } else {
-    return values.length === 1 ? values[0] : values;
-  }
+  return queryString.parse(window.location.search)[variable]
 }
 
 export function setFlatFileContentToState(file) {
@@ -45,40 +12,37 @@ export function setFlatFileContentToState(file) {
 }
 
 export function getWhiteListWithCapCrowdsaleAssets() {
-  return new Promise((resolve, reject) => {
-    const contractsRoute = './contracts/'
-    const crowdsaleFilename = 'CrowdsaleWhiteListWithCap'
-    const binAbi = ['bin', 'abi']
+  const contractsRoute = './contracts/'
+  const crowdsaleFilename = 'CrowdsaleWhiteListWithCap'
+  const binAbi = ['bin', 'abi']
 
-    const crowdsaleFiles = ['sol', ...binAbi].map(ext => `${contractsRoute}${crowdsaleFilename}_flat.${ext}`)
-    const tokenFiles = binAbi.map(ext => `${contractsRoute}${crowdsaleFilename}Token_flat.${ext}`)
-    const pricingFiles = binAbi.map(ext => `${contractsRoute}${crowdsaleFilename}PricingStrategy_flat.${ext}`)
-    const finalizeFiles = binAbi.map(ext => `${contractsRoute}FinalizeAgent_flat.${ext}`)
-    const nullFiles = binAbi.map(ext => `${contractsRoute}NullFinalizeAgent_flat.${ext}`)
-    const registryFiles = binAbi.map(ext => `${contractsRoute}Registry_flat.${ext}`)
+  const crowdsaleFiles = ['sol', ...binAbi].map(ext => `${contractsRoute}${crowdsaleFilename}_flat.${ext}`)
+  const tokenFiles = binAbi.map(ext => `${contractsRoute}${crowdsaleFilename}Token_flat.${ext}`)
+  const pricingFiles = binAbi.map(ext => `${contractsRoute}${crowdsaleFilename}PricingStrategy_flat.${ext}`)
+  const finalizeFiles = binAbi.map(ext => `${contractsRoute}FinalizeAgent_flat.${ext}`)
+  const nullFiles = binAbi.map(ext => `${contractsRoute}NullFinalizeAgent_flat.${ext}`)
+  const registryFiles = binAbi.map(ext => `${contractsRoute}Registry_flat.${ext}`)
 
-    const states = crowdsaleFiles.concat(tokenFiles, pricingFiles, finalizeFiles, nullFiles, registryFiles)
-      .map(setFlatFileContentToState)
+  const states = crowdsaleFiles.concat(tokenFiles, pricingFiles, finalizeFiles, nullFiles, registryFiles)
+    .map(setFlatFileContentToState)
 
-    Promise.all(states)
-      .then(state => {
-        contractStore.setContractProperty('crowdsale', 'src', state[0])
-        contractStore.setContractProperty('crowdsale', 'bin', state[1])
-        contractStore.setContractProperty('crowdsale', 'abi', JSON.parse(state[2]))
-        contractStore.setContractProperty('token', 'bin', state[3])
-        contractStore.setContractProperty('token', 'abi', JSON.parse(state[4]))
-        contractStore.setContractProperty('pricingStrategy', 'bin', state[5])
-        contractStore.setContractProperty('pricingStrategy', 'abi', JSON.parse(state[6]))
-        contractStore.setContractProperty('finalizeAgent', 'bin', state[7])
-        contractStore.setContractProperty('finalizeAgent', 'abi', JSON.parse(state[8]))
-        contractStore.setContractProperty('nullFinalizeAgent', 'bin', state[9])
-        contractStore.setContractProperty('nullFinalizeAgent', 'abi', JSON.parse(state[10]))
-        contractStore.setContractProperty('registry', 'bin', state[11])
-        contractStore.setContractProperty('registry', 'abi', JSON.parse(state[12]))
-        resolve(contractStore)
-      })
-      .catch(reject)
-  })
+  return Promise.all(states)
+    .then(state => {
+      contractStore.setContractProperty('crowdsale', 'src', state[0])
+      contractStore.setContractProperty('crowdsale', 'bin', state[1])
+      contractStore.setContractProperty('crowdsale', 'abi', JSON.parse(state[2]))
+      contractStore.setContractProperty('token', 'bin', state[3])
+      contractStore.setContractProperty('token', 'abi', JSON.parse(state[4]))
+      contractStore.setContractProperty('pricingStrategy', 'bin', state[5])
+      contractStore.setContractProperty('pricingStrategy', 'abi', JSON.parse(state[6]))
+      contractStore.setContractProperty('finalizeAgent', 'bin', state[7])
+      contractStore.setContractProperty('finalizeAgent', 'abi', JSON.parse(state[8]))
+      contractStore.setContractProperty('nullFinalizeAgent', 'bin', state[9])
+      contractStore.setContractProperty('nullFinalizeAgent', 'abi', JSON.parse(state[10]))
+      contractStore.setContractProperty('registry', 'bin', state[11])
+      contractStore.setContractProperty('registry', 'abi', JSON.parse(state[12]))
+      return contractStore
+    })
 }
 
 export function fetchFile(path) {
@@ -166,7 +130,7 @@ export const getconstructorParams = (abiConstructor, vals, crowdsaleNum) => {
           params.vals.push(tokenStore.decimals);
           break;
         case "_globalMinCap":
-          params.vals.push(tierStore.tiers[0].whitelistdisabled === "yes" ? tokenStore.globalmincap ? toFixed(tokenStore.globalmincap * 10**tokenStore.decimals).toString() : 0 : 0);
+          params.vals.push(tierStore.tiers[0].whitelistEnabled !== 'yes' ? tokenStore.globalmincap ? toFixed(tokenStore.globalmincap * 10 ** tokenStore.decimals).toString() : 0 : 0)
           break;
         case "_tokenSupply":
         case "_initialSupply":
@@ -207,7 +171,7 @@ export const getconstructorParams = (abiConstructor, vals, crowdsaleNum) => {
           params.vals.push(tierStore.tiers[crowdsaleNum].updatable ? tierStore.tiers[crowdsaleNum].updatable==="on" ? true : false : false);
           break;
         case "_isWhiteListed":
-          params.vals.push(tierStore.tiers[0].whitelistdisabled ? tierStore.tiers[0].whitelistdisabled==="yes" ? false : true : false);
+          params.vals.push(tierStore.tiers[0].whitelistEnabled ? tierStore.tiers[0].whitelistEnabled === "yes" : false)
           break;
         default:
           params.vals.push("");
@@ -264,7 +228,7 @@ export const validateSupply = (supply) =>  isNaN(Number(supply)) === false && Nu
 
 export const validateDecimals = (decimals) => isNaN(Number(decimals)) === false && Number(decimals) >= 0 && Number(decimals) <= 18
 
-export const validateTicker = (ticker) => typeof ticker === 'string' && ticker.length < 4 && ticker.length > 0
+export const validateTicker = (ticker) => typeof ticker === 'string' && ticker.length <= 5 && ticker.length > 0
 
 export const validateTime = (time) => getTimeAsNumber(time) > Date.now()
 

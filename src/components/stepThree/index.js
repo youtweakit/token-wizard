@@ -32,10 +32,10 @@ const {
   WALLET_ADDRESS,
   CROWDSALE_SETUP_NAME,
   ALLOWMODIFYING,
-  DISABLEWHITELISTING
+  ENABLE_WHITELISTING
 } = TEXT_FIELDS;
 
-@inject("contractStore", "crowdsaleBlockListStore", "pricingStrategyStore", "web3Store", "tierStore", "generalStore", "gasPriceStore", "reservedTokenStore")
+@inject("contractStore", "crowdsaleBlockListStore", "pricingStrategyStore", "web3Store", "tierStore", "generalStore", "gasPriceStore", "reservedTokenStore", "deploymentStore")
 @observer
 export class stepThree extends React.Component {
   constructor(props) {
@@ -49,7 +49,7 @@ export class stepThree extends React.Component {
     crowdsaleBlockListStore.emptyList();
     tierStore.setTierProperty("Tier 1", "tier", 0);
     tierStore.setTierProperty("off", "updatable", 0);
-    tierStore.setTierProperty("yes", "whitelistdisabled", 0);
+    tierStore.setTierProperty("no", "whitelistEnabled", 0);
 
     this.state = {
       loading: true,
@@ -156,17 +156,22 @@ export class stepThree extends React.Component {
     }
 
     if (tierStore.areTiersValid) {
+      const { reservedTokenStore, deploymentStore } = this.props
+      const tiersCount = tierStore.tiers.length
+      const reservedCount = reservedTokenStore.tokens.length
+      const hasWhitelist = tierStore.tiers[0].whitelistEnabled === 'yes'
+
+      deploymentStore.initialize(!!reservedCount, hasWhitelist, tiersCount)
+
       getNetworkVersion()
         .then(networkID => {
           if (getNetWorkNameById(networkID) === CHAINS.MAINNET) {
-            const { generalStore, reservedTokenStore } = this.props
-
-            const tiersCount = tierStore.tiers.length
+            const { generalStore } = this.props
             const priceSelected = generalStore.gasPrice
-            const reservedCount = reservedTokenStore.tokens.length
+
             let whitelistCount = 0
 
-            if (tierStore.tiers[0].whitelistdisabled === 'no') {
+            if (hasWhitelist) {
               whitelistCount = tierStore.tiers.reduce((total, tier) => {
                 total += tier.whitelist.filter(address => !address.deleted).length
                 return total
@@ -283,9 +288,9 @@ export class stepThree extends React.Component {
     );
   }
 
-  updateWhitelistDisabled = (e) => {
+  updateWhitelistEnabled = (e) => {
     this.props.tierStore.setGlobalMinCap('')
-    this.updateTierStore(e, "whitelistdisabled", 0)
+    this.updateTierStore(e, "whitelistEnabled", 0)
   }
 
   render() {
@@ -312,7 +317,7 @@ export class stepThree extends React.Component {
           <InputField
             side="left"
             type="number"
-            disabled={tierStore.tiers[0].whitelistdisabled === "no"}
+            disabled={tierStore.tiers[0].whitelistEnabled === "yes"}
             title={MINCAP}
             value={tierStore.globalMinCap}
             valid={VALID}
@@ -321,16 +326,12 @@ export class stepThree extends React.Component {
             description={`Minimum amount tokens to buy. Not a minimal size of a transaction. If minCap is 1 and user bought 1 token in a previous transaction and buying 0.1 token it will allow him to buy.`}
           />
           <RadioInputField
-            side="right"
-            title={DISABLEWHITELISTING}
-            items={["yes", "no"]}
-            vals={["yes", "no"]}
-            state={this.state}
-            num={0}
-            defaultValue={tierStore.tiers[0].whitelistdisabled}
-            name="crowdsale-whitelistdisabled-0"
-            onChange={e => this.updateWhitelistDisabled(e)}
-            description={`Disables whitelistings. Anyone can buy on the tier.`}
+            extraClassName="right"
+            title={ENABLE_WHITELISTING}
+            items={[{ label: 'yes', value: 'yes' }, { label: 'no', value: 'no' }]}
+            selectedItem={tierStore.tiers[0].whitelistEnabled}
+            onChange={e => this.updateWhitelistEnabled(e)}
+            description={`Enables whitelisting. If disabled, anyone can participate in the crowdsale.`}
           />
         </div>
       </div>
@@ -374,14 +375,10 @@ export class stepThree extends React.Component {
                   description={`Name of a tier, e.g. PrePreIco, PreICO, ICO with bonus A, ICO with bonus B, etc. We simplified that and will increment a number after each tier.`}
                 />
                 <RadioInputField
-                  side="right"
+                  extraClassName="right"
                   title={ALLOWMODIFYING}
-                  items={["on", "off"]}
-                  vals={["on", "off"]}
-                  state={this.state}
-                  num={0}
-                  defaultValue={tierStore.tiers[0].updatable}
-                  name="crowdsale-updatable-0"
+                  items={[{ label: 'on', value: 'on' }, { label: 'off', value: 'off' }]}
+                  selectedItem={this.props.tierStore.tiers[0].updatable}
                   onChange={e => this.updateTierStore(e, "updatable", 0)}
                   description={`Pandora box feature. If it's enabled, a creator of the crowdsale can modify Start time, End time, Rate, Limit after publishing.`}
                 />
@@ -431,7 +428,7 @@ export class stepThree extends React.Component {
                 />
               </div>
             </div>
-            {tierStore.tiers[0].whitelistdisabled === "yes" ? "" : whitelistInputBlock}
+            {tierStore.tiers[0].whitelistEnabled === "yes" ? whitelistInputBlock : ""}
           </div>
 
           {/* Other tiers */}

@@ -22,14 +22,18 @@ describe('blockchainHelpers', () => {
       expect(getNetWorkNameById(42)).toEqual('Kovan');
     });
 
-    it('should work for oracles dev test network', () => {
-      expect(getNetWorkNameById(12648430)).toEqual('Oracles dev test');
+    it('should work for sokol', () => {
+      expect(getNetWorkNameById(77)).toEqual('Sokol');
     });
 
-    it('should return Unknown for unknown network ids', () => {
-      expect(getNetWorkNameById(5)).toEqual('Unknown');
-      expect(getNetWorkNameById(43)).toEqual('Unknown');
-      expect(getNetWorkNameById(1000)).toEqual('Unknown');
+    it('should work for core POA', () => {
+      expect(getNetWorkNameById(99)).toEqual('Core_POA');
+    });
+
+    it('should return null for unknown network ids', () => {
+      expect(getNetWorkNameById(5)).toEqual(null);
+      expect(getNetWorkNameById(43)).toEqual(null);
+      expect(getNetWorkNameById(1000)).toEqual(null);
     })
   })
 })

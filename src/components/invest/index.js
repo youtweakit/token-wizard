@@ -11,7 +11,7 @@ import {
   getJoinedTiers,
   initializeAccumulativeData
 } from '../crowdsale/utils'
-import { getQueryVariable, getURLParam, getWhiteListWithCapCrowdsaleAssets, toast } from '../../utils/utils'
+import { getQueryVariable, getWhiteListWithCapCrowdsaleAssets, toast } from '../../utils/utils'
 import {
   invalidCrowdsaleAddrAlert,
   investmentDisabledAlertInTime, noGasPriceAvailable,
@@ -37,7 +37,7 @@ export class Invest extends React.Component {
       pristineTokenInput: true,
       web3Available: false,
       investThrough: INVESTMENT_OPTIONS.QR,
-      crowdsaleAddress: ICOConfig.crowdsaleContractURL || getURLParam('addr')
+      crowdsaleAddress: ICOConfig.crowdsaleContractURL || getQueryVariable('addr')
     }
   }
 
@@ -76,7 +76,7 @@ export class Invest extends React.Component {
     const { contractStore, crowdsalePageStore, web3Store } = this.props
     const { web3 } = web3Store
 
-    const crowdsaleAddr = ICOConfig.crowdsaleContractURL ? ICOConfig.crowdsaleContractURL : getURLParam('addr')
+    const crowdsaleAddr = ICOConfig.crowdsaleContractURL ? ICOConfig.crowdsaleContractURL : getQueryVariable('addr')
 
     if (!web3.utils.isAddress(crowdsaleAddr)) {
       this.setState({ loading: false })
@@ -105,7 +105,7 @@ export class Invest extends React.Component {
           return
         }
 
-        findCurrentContractRecursively(0, this, null, crowdsaleContract => {
+        findCurrentContractRecursively(0, null, crowdsaleContract => {
           if (!crowdsaleContract) {
             this.setState({ loading: false })
             return
@@ -113,7 +113,7 @@ export class Invest extends React.Component {
 
           initializeAccumulativeData()
             .then(() => getCrowdsaleData(crowdsaleContract))
-            .then(() => getAccumulativeCrowdsaleData.call(this, () => Promise.resolve()))
+            .then(() => getAccumulativeCrowdsaleData())
             .then(() => this.setState({ loading: false }))
             .catch(err => {
               this.setState({ loading: false })
@@ -170,14 +170,15 @@ export class Invest extends React.Component {
       return investmentDisabledAlertInTime(crowdsalePageStore.startDate)
     }
 
-    findCurrentContractRecursively(0, this, null, (crowdsaleContract, tierNum) => {
+    findCurrentContractRecursively(0, null, (crowdsaleContract, tierNum) => {
       if (!crowdsaleContract) {
         this.setState({ loading: false })
         return
       }
 
       getCurrentRate(crowdsaleContract)
-        .then(() => this.investToTokensForWhitelistedCrowdsaleInternal(crowdsaleContract, tierNum, web3.eth.accounts))
+        .then(() => web3.eth.getAccounts())
+        .then((accounts) => this.investToTokensForWhitelistedCrowdsaleInternal(crowdsaleContract, tierNum, accounts))
         .catch(console.log)
     })
   }
@@ -371,7 +372,7 @@ export class Invest extends React.Component {
           <p className="invest-title">Invest page</p>
           <p className="invest-description">
             {'Here you can invest in the crowdsale campaign. At the moment, you need Metamask client to invest into the crowdsale. If you don\'t have Metamask, you can send ethers to the crowdsale address with a MethodID: 0xa6f2ae3a. Sample '}
-            <a href="https://kovan.etherscan.io/tx/0x42073576a160206e61b4d9b70b436359b8d220f8b88c7c272c77023513c62c3d">transaction</a>.
+            <a href="https://kovan.etherscan.io/tx/0x42073576a160206e61b4d9b70b436359b8d220f8b88c7c272c77023513c62c3d">transaction</a> on Kovan network.
           </p>
         </div>
         <div className="invest-table-cell invest-table-cell_right">

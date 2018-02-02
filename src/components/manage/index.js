@@ -6,24 +6,34 @@ import { CONTRACT_TYPES, TEXT_FIELDS, TOAST, VALIDATION_MESSAGES } from '../../u
 import { InputField } from '../Common/InputField'
 import '../../assets/stylesheets/application.css'
 import { WhitelistInputBlock } from '../Common/WhitelistInputBlock'
-import { successfulFinalizeAlert, successfulUpdateCrowdsaleAlert, warningOnFinalizeCrowdsale } from '../../utils/alerts'
-import { getNetworkVersion, sendTXToContract } from '../../utils/blockchainHelpers'
+import { successfulFinalizeAlert, successfulDistributeAlert, successfulUpdateCrowdsaleAlert, warningOnFinalizeCrowdsale } from '../../utils/alerts'
+import { getNetworkVersion, sendTXToContract, attachToContract, calculateGasLimit } from '../../utils/blockchainHelpers'
 import { getWhiteListWithCapCrowdsaleAssets, toast } from '../../utils/utils'
-import { findCurrentContractRecursively, getCurrentRate } from '../crowdsale/utils'
-import { getTiers, processTier, updateTierAttribute } from './utils'
+import { contractsInfo, getTiers, processTier, updateTierAttribute } from './utils'
 import { Loader } from '../Common/Loader'
 
 const { START_TIME, END_TIME, RATE, SUPPLY, WALLET_ADDRESS, CROWDSALE_SETUP_NAME } = TEXT_FIELDS
 
-@inject('crowdsaleStore', 'web3Store', 'tierStore', 'contractStore', 'crowdsalePageStore', 'generalStore', 'tokenStore')
-
+@inject(
+  'crowdsaleStore',
+  'web3Store',
+  'tierStore',
+  'contractStore',
+  'crowdsalePageStore',
+  'generalStore',
+  'tokenStore',
+  'gasPriceStore'
+)
 @observer
 export class Manage extends Component {
   constructor (props) {
     super(props)
     this.state = {
       formPristine: true,
-      loading: true
+      loading: true,
+      canFinalize: false,
+      canDistribute: false,
+      shouldDistribute: false
     }
   }
 
@@ -70,6 +80,7 @@ export class Manage extends Component {
           return promise.then(() => processTier(addr, index))
         }, Promise.resolve())
       })
+      .then(this.updateCrowdsaleStatus)
       .catch(console.log)
       .then(this.hideLoader)
   }
@@ -82,46 +93,189 @@ export class Manage extends Component {
     this.setState({ loading: true })
   }
 
-  isLastTier = crowdsaleContract => {
-    const { contractStore } = this.props
-    const crowdsalesAddresses = contractStore.crowdsale.addr
-    return crowdsalesAddresses[crowdsalesAddresses.length - 1] === crowdsaleContract._address
+  updateCrowdsaleStatus = () => {
+    return contractsInfo()
+      .then(this.setCrowdsaleInfo)
+      .then(this.shouldDistribute)
+      .then(this.canDistribute)
+      .then(this.canFinalize)
+  }
+
+  setCrowdsaleInfo = contracts => {
+    this.setState({
+      crowdsaleHasEnded: contracts.every(contract => !contract.current),
+      lastContract: contracts.slice(-1)[0].contract
+    })
+  }
+
+  shouldDistribute = () => {
+    const { contractStore, match } = this.props
+
+    return new Promise(resolve => {
+      attachToContract(contractStore.crowdsale.abi, match.params.crowdsaleAddress)
+      .then(crowdsaleContract => { // eslint-disable-line no-loop-func
+        console.log('attach to crowdsale contract')
+
+        if (!crowdsaleContract) return Promise.reject('No contract available')
+
+        crowdsaleContract.methods.token().call()
+        .then(tokenAddress => attachToContract(contractStore.token.abi, tokenAddress))
+        .then(tokenContract => tokenContract.methods.reservedTokensDestinationsLen().call())
+        .then((reservedTokensDestinationsLen) => {
+          if (reservedTokensDestinationsLen > 0)
+            this.setState({ shouldDistribute: true })
+          else
+            this.setState({ shouldDistribute: false })
+          resolve(this.state.shouldDistribute)
+        })
+        .catch(() => {
+          this.setState({ shouldDistribute: false })
+          resolve(this.state.shouldDistribute)
+        })
+      })
+    })
+  }
+
+  canDistribute = () => {
+    const { contractStore, match } = this.props
+
+    return new Promise(resolve => {
+      attachToContract(contractStore.crowdsale.abi, match.params.crowdsaleAddress)
+        .then(crowdsaleContract => { // eslint-disable-line no-loop-func
+          console.log('attach to crowdsale contract')
+
+          if (!crowdsaleContract) return Promise.reject('No contract available')
+
+          crowdsaleContract.methods.canDistributeReservedTokens().call((err, canDistributeReservedTokens) => {
+            return canDistributeReservedTokens;
+          }).then((canDistributeReservedTokens) => {
+            console.log("#canDistributeReservedTokens:", canDistributeReservedTokens);
+            this.setState({ canDistribute: canDistributeReservedTokens })
+            resolve(this.state.canDistribute)
+          })
+          .catch(() => {
+            this.setState({ canDistribute: false })
+            resolve(this.state.canDistribute)
+          })
+        })
+    })
+  }
+
+
+  canFinalize = () => {
+    const { contractStore, match } = this.props
+
+    return new Promise(resolve => {
+      if ((!this.state.crowdsaleHasEnded) || (this.state.shouldDistribute && this.state.canDistribute)) {
+        this.setState({ canFinalize: false })
+        resolve(this.state.canFinalize)
+
+      } else {
+        attachToContract(contractStore.crowdsale.abi, match.params.crowdsaleAddress)
+          .then(crowdsaleContract => { // eslint-disable-line no-loop-func
+            console.log('attach to crowdsale contract')
+
+            if (!crowdsaleContract) return Promise.reject('No contract available')
+            crowdsaleContract.methods.finalized().call((err, finalized) => {
+              return finalized;
+            }).then((finalized) => {
+              this.setState({ canFinalize: !finalized })
+              resolve(this.state.canFinalize)
+            })
+            .catch(() => {
+              this.setState({ canFinalize: false })
+              resolve(this.state.canFinalize)
+            })
+          })
+      }
+    })
+  }
+
+  distributeReservedTokens = (addressesPerBatch) => {
+    this.updateCrowdsaleStatus()
+      .then(() => {
+        const { crowdsaleStore, contractStore } = this.props
+
+        if (!crowdsaleStore.selected.distributed && this.state.canDistribute) {
+          this.showLoader()
+
+          const crowdsaleContract = this.state.lastContract
+          crowdsaleContract.methods.token().call()
+          .then(token => {
+            attachToContract(contractStore.token.abi, token)
+            .then(tokenContract => {
+              tokenContract.methods.reservedTokensDestinationsLen().call()
+              .then(reservedTokensDestinationsLen => {
+
+                const batchesLen = Math.ceil(reservedTokensDestinationsLen / addressesPerBatch)
+
+                const distributeMethod = crowdsaleContract.methods.distributeReservedTokens(addressesPerBatch)
+                let opts = {
+                  gasPrice: this.props.generalStore.gasPrice
+                }
+                let batches = Array.from(Array(batchesLen).keys());
+                this.distributeReservedTokensRecursive(batches, distributeMethod, opts)
+                .then(() => {
+                  successfulDistributeAlert()
+                  crowdsaleStore.setSelectedProperty('distributed', true)
+                  this.setState({ canDistribute: false, canFinalize: true })
+                })
+                .catch(() => toast.showToaster({ type: TOAST.TYPE.ERROR, message: TOAST.MESSAGE.DISTRIBUTE_FAIL }))
+                .then(this.hideLoader)
+              })
+            })
+          })
+        }
+      })
+      .catch(console.error)
+  }
+
+  distributeReservedTokensRecursive = (batches, distributeMethod, opts) => {
+    return batches.reduce((promise) => {
+      return promise
+        .then(() => distributeMethod.estimateGas(opts)
+          .then(estimatedGas => {
+            opts.gasLimit = calculateGasLimit(estimatedGas)
+            return sendTXToContract(distributeMethod.send(opts))
+          })
+        )
+    }, Promise.resolve())
   }
 
   finalizeCrowdsale = () => {
-    const { crowdsaleStore } = this.props
+    this.updateCrowdsaleStatus()
+      .then(() => {
+        const { crowdsaleStore } = this.props
 
-    if (!crowdsaleStore.selected.finalized) {
-      warningOnFinalizeCrowdsale()
-        .then(result => {
-          if (result.value) {
-            findCurrentContractRecursively(0, this, null, crowdsaleContract => {
-              this.showLoader()
+        if (!crowdsaleStore.selected.finalized && this.state.canFinalize) {
+          warningOnFinalizeCrowdsale()
+            .then(result => {
+              if (result.value) {
+                this.showLoader()
 
-              if (!this.isLastTier(crowdsaleContract)) {
-                this.hideLoader()
-                toast.showToaster({ type: TOAST.TYPE.ERROR, message: TOAST.MESSAGE.FINALIZE_FAIL })
-
-              } else {
-                const finalizeMethod = crowdsaleContract.methods.finalize().send({
-                  gasLimit: 650000,
+                const crowdsaleContract = this.state.lastContract
+                const finalizeMethod = crowdsaleContract.methods.finalize()
+                let opts = {
                   gasPrice: this.props.generalStore.gasPrice
-                })
+                }
 
-                getCurrentRate(crowdsaleContract)
-                  .then(() => sendTXToContract(finalizeMethod))
+                finalizeMethod.estimateGas(opts)
+                .then(estimatedGas => {
+                  opts.gasLimit = calculateGasLimit(estimatedGas)
+                  sendTXToContract(finalizeMethod.send(opts))
                   .then(() => {
                     successfulFinalizeAlert()
                     crowdsaleStore.setSelectedProperty('finalized', true)
+                    this.setState({ canFinalize: false })
                   })
-                  .catch(err => toast.showToaster({ type: TOAST.TYPE.ERROR, message: TOAST.MESSAGE.FINALIZE_FAIL }))
+                  .catch(() => toast.showToaster({ type: TOAST.TYPE.ERROR, message: TOAST.MESSAGE.FINALIZE_FAIL }))
                   .then(this.hideLoader)
+                })
               }
             })
-
-          }
-        })
-    }
+        }
+      })
+      .catch(console.error)
   }
 
   saveCrowdsale = e => {
@@ -130,47 +284,41 @@ export class Manage extends Component {
     e.preventDefault()
     e.stopPropagation()
 
-    if (!this.state.formPristine) {
-      const { crowdsaleStore, tierStore } = this.props
-      const updatableTiers = crowdsaleStore.selected.initialTiersValues.filter(tier => tier.updatable)
-
-      if (updatableTiers.length) {
+    this.updateCrowdsaleStatus()
+      .then(() => {
+        const { crowdsaleStore, tierStore } = this.props
+        const updatableTiers = crowdsaleStore.selected.initialTiersValues.filter(tier => tier.updatable)
         const isValidTier = tierStore.individuallyValidTiers
-        console.log(isValidTier)
-
         const validTiers = updatableTiers.every(tier => isValidTier[tier.index])
 
-        if (validTiers) {
-          const keys = Object.keys(updatableTiers[0])
+        if (!this.state.formPristine && !this.state.crowdsaleHasEnded && updatableTiers.length && validTiers) {
+          const keys = Object
+            .keys(updatableTiers[0])
             .filter(key => key !== 'index' && key !== 'updatable' && key !== 'addresses' && key !== 'whitelistElements')
 
-          const attributesToUpdate = updatableTiers.reduce((toUpdate, tier) => {
-            keys.forEach(key => {
-              const { addresses } = tier
-              let newValue = tierStore.tiers[tier.index][key]
+          updatableTiers
+            .reduce((toUpdate, tier) => {
+              keys.forEach(key => {
+                const { addresses } = tier
+                let newValue = tierStore.tiers[tier.index][key]
 
-              if (isObservableArray(newValue)) {
-                if (newValue.length > tier[key].length) {
-                  newValue = newValue.slice(tier[key].length).filter(whitelist => !whitelist.deleted)
-
-                  if (newValue.length) {
-                    toUpdate.push({ key, newValue, addresses })
+                if (isObservableArray(newValue)) {
+                  if (newValue.length > tier[key].length) {
+                    newValue = newValue.slice(tier[key].length).filter(whitelist => !whitelist.deleted)
+                    if (newValue.length) {
+                      toUpdate.push({ key, newValue, addresses })
+                    }
                   }
+
+                } else if (newValue !== tier[key]) {
+                  toUpdate.push({ key, newValue, addresses })
                 }
-
-              } else if (newValue !== tier[key]) {
-                toUpdate.push({ key, newValue, addresses })
-              }
-            })
-
-            return toUpdate
-          }, [])
-
-          this.showLoader()
-
-          attributesToUpdate.reduce((promise, { key, newValue, addresses }) => {
-            return promise.then(() => updateTierAttribute(key, newValue, addresses))
-          }, Promise.resolve())
+              })
+              return toUpdate
+            }, [])
+            .reduce((promise, { key, newValue, addresses }) => {
+              return promise.then(() => updateTierAttribute(key, newValue, addresses))
+            }, Promise.resolve())
             .then(() => {
               this.hideLoader()
               successfulUpdateCrowdsaleAlert()
@@ -180,15 +328,15 @@ export class Manage extends Component {
               this.hideLoader()
               toast.showToaster({ type: TOAST.TYPE.ERROR, message: TOAST.MESSAGE.TRANSACTION_FAILED })
             })
+
         } else {
           this.hideLoader()
         }
-      } else {
+      })
+      .catch(error => {
+        console.error(error)
         this.hideLoader()
-      }
-    } else {
-      this.hideLoader()
-    }
+      })
   }
 
   changeState = (event, parent, key, property) => {
@@ -240,7 +388,7 @@ export class Manage extends Component {
   renderWhitelistInputBlock = (tier, index) => {
     const { crowdsaleStore, tierStore } = this.props
 
-    if (tierStore.tiers[0].whitelistdisabled === 'yes') {
+    if (tierStore.tiers[0].whitelistEnabled !== 'yes') {
       return null
     }
 
@@ -249,7 +397,7 @@ export class Manage extends Component {
         <div className="section-title">
           <p className="title">Whitelist</p>
         </div>
-        {tier.updatable && !crowdsaleStore.selected.finalized
+        {tier.updatable && !crowdsaleStore.selected.finalized && !this.state.crowdsaleHasEnded
           ? this.whitelistInputBlock(index)
           : this.readOnlyWhitelistedAddresses(tier)
         }
@@ -275,9 +423,23 @@ export class Manage extends Component {
   }
 
   render () {
-    const { formPristine } = this.state
+    const { formPristine, canFinalize, shouldDistribute, canDistribute, crowdsaleHasEnded } = this.state
     const { generalStore, tierStore, tokenStore, crowdsaleStore } = this.props
     const { address: crowdsaleAddress, finalized, updatable } = crowdsaleStore.selected
+
+    const distributeTokensStep = (
+      <div className="steps-content container">
+        <div className="about-step">
+          <div className="swal2-icon swal2-info warning-logo">!</div>
+          <p className="title">Distribute reserved tokens</p>
+          <p className="description">Reserved tokens distribution is the last step of the crowdsale before finalization.
+            You can make it only after the end of the last tier. If you reserved more then 100 addresses for your crowdsale, the distribution will be executed in batches with 100 reserved addresses per batch. Amount of batches is equal to amount of transactions</p>
+          <Link to='#' onClick={() => this.distributeReservedTokens(100)}>
+            <span className={`button button_${!canDistribute ? 'disabled' : 'fill'}`}>Distribute tokens</span>
+          </Link>
+        </div>
+      </div>
+    )
 
     const aboutStep = (
       <div className="about-step">
@@ -287,7 +449,7 @@ export class Manage extends Component {
           You can make it only after the end of the last tier. After finalization, it's not possible to update tiers,
           buy tokens. All tokens will be movable, reserved tokens will be issued.</p>
         <Link to='#' onClick={() => this.finalizeCrowdsale()}>
-          <span className={`button button_${finalized ? 'disabled' : 'fill'}`}>Finalize Crowdsale</span>
+          <span className={`button button_${finalized || !canFinalize ? 'disabled' : 'fill'}`}>Finalize Crowdsale</span>
         </Link>
       </div>
     )
@@ -306,7 +468,8 @@ export class Manage extends Component {
 
     const saveButton = (
       <Link to='/2' onClick={e => this.saveCrowdsale(e)}>
-        <span className={`no-arrow button button_${!formPristine ? 'fill' : 'disabled'}`}>Save</span>
+        <span
+          className={`no-arrow button button_${!formPristine && !crowdsaleHasEnded ? 'fill' : 'disabled'}`}>Save</span>
       </Link>
     )
 
@@ -340,7 +503,7 @@ export class Manage extends Component {
           errorMessage={VALIDATION_MESSAGES.EDITED_START_TIME}
           onChange={e => this.updateTierStore(e, 'startTime', index)}
           description="Date and time when the tier starts. Can't be in the past from the current moment."
-          disabled={!tier.updatable || finalized}
+          disabled={!tier.updatable || crowdsaleHasEnded}
         />
         <InputField
           side='right'
@@ -351,7 +514,7 @@ export class Manage extends Component {
           errorMessage={VALIDATION_MESSAGES.EDITED_END_TIME}
           onChange={e => this.updateTierStore(e, 'endTime', index)}
           description="Date and time when the tier ends. Can be only in the future."
-          disabled={!tier.updatable || finalized}
+          disabled={!tier.updatable || crowdsaleHasEnded}
         />
       </div>
     }
@@ -367,7 +530,7 @@ export class Manage extends Component {
           errorMessage={VALIDATION_MESSAGES.RATE}
           onChange={e => this.updateTierStore(e, 'rate', index)}
           description="Exchange rate Ethereum to Tokens. If it's 100, then for 1 Ether you can buy 100 tokens"
-          disabled={!tier.updatable || finalized}
+          disabled={!tier.updatable || crowdsaleHasEnded}
         />
         <InputField
           side='right'
@@ -378,13 +541,14 @@ export class Manage extends Component {
           errorMessage={VALIDATION_MESSAGES.SUPPLY}
           onChange={e => this.updateTierStore(e, 'supply', index)}
           description="How many tokens will be sold on this tier. Cap of crowdsale equals to sum of supply of all tiers"
-          disabled={!tier.updatable || finalized}
+          disabled={!tier.updatable || crowdsaleHasEnded}
         />
       </div>
     }
 
     return (
       <section className="manage">
+        {shouldDistribute ? distributeTokensStep : null}
         <div className="steps-content container">
           {aboutStep}
         </div>
@@ -392,7 +556,7 @@ export class Manage extends Component {
           <div className="steps" key={index.toString()}>
             <div className="steps-content container">
               {index === 0 ? aboutTier : null}
-              <div className={`hidden ${tierStore.tiers[0].whitelistdisabled !== 'yes' ? 'divisor' : ''}`}>
+              <div className={`hidden ${tierStore.tiers[0].whitelistEnabled === 'yes' ? 'divisor' : ''}`}>
                 {tierNameAndWallet(tier)}
                 {tierStartAndEndTime(tier, index)}
                 {tierRateAndSupply(tier, index)}
@@ -403,7 +567,7 @@ export class Manage extends Component {
         ))}
         <div className="steps">
           <div className="button-container">
-            {!finalized && updatable ? saveButton : null}
+            {!crowdsaleHasEnded && updatable ? saveButton : null}
           </div>
         </div>
         <Loader show={this.state.loading}/>
