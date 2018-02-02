@@ -159,7 +159,7 @@ export const TEXT_FIELDS = {
   ADDRESS: 'Address',
   MIN: 'Min',
   MAX: 'Max',
-  MINCAP: 'Investor min cap',
+  MINCAP: 'Contributor min cap (tokens)',
   DIMENSION: 'Dimension',
   VALUE: 'Value',
   MAX_CAP: 'Max cap',
