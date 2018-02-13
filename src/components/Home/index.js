@@ -52,6 +52,7 @@ export class Home extends Component {
               <p className="description">
               Token Wizard is a client side tool to create token and crowdsale contracts in five steps. It helps you to publish contracts on the Ethereum network, verify them in Etherscan, create a crowdsale page with stats. For participants, the wizard creates a page to invest into the campaign.
               <br/>Smart contracts based on <a href="https://github.com/TokenMarketNet/ico">TokenMarket</a> contracts.
+              <br/>You can build an Airdrop now!
               </p>
               <div className="buttons">
                 <Link to='/2a'><span className="button button_outline">New Airdrop</span></Link>
