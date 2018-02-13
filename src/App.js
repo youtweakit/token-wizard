@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import './assets/stylesheets/application.css';
-import { Header, Footer, Home, Manage, stepOne, stepTwo, stepThree, stepFour, Crowdsale, Invest } from './components/index'
+import { Header, Footer, Home, Manage, stepOne, stepTwo, stepThree, stepFour, Crowdsale, Invest, AirdropSetup, Airdrop } from './components/index'
 import { getQueryVariable } from './utils/utils'
 import {
   BrowserRouter as Router,
@@ -22,6 +22,8 @@ class App extends Component {
           <Route exact path="/crowdsale" component={Crowdsale}/>
           <Route exact path="/invest" component={Invest}/>
           <Route exact path="/manage/:crowdsaleAddress" component={Manage}/>
+          <Route exact path="/airdrop" component={Airdrop}/>
+          <Route path="/2a" component={airdropsetup}/>
           <Route path="/1" component={stepOne}/>
           <Route path="/2" component={stepTwo}/>
           <Route path="/3" component={stepThree}/>
