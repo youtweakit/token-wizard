@@ -54,6 +54,7 @@ export class Home extends Component {
               <br/>Smart contracts based on <a href="https://github.com/TokenMarketNet/ico">TokenMarket</a> contracts.
               </p>
               <div className="buttons">
+                <Link to='/2a'><span className="button button_outline">New Airdrop</span></Link>
                 <Link to='/1'><span className="button button_fill">New crowdsale</span></Link>
                 <div onClick={() => this.chooseContract()} className="button button_outline">Choose Contract</div>
               </div>
