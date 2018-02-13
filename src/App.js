@@ -23,7 +23,7 @@ class App extends Component {
           <Route exact path="/invest" component={Invest}/>
           <Route exact path="/manage/:crowdsaleAddress" component={Manage}/>
           <Route exact path="/airdrop" component={Airdrop}/>
-          <Route path="/2a" component={airdropsetup}/>
+          <Route path="/airdropsetup" component={airdropsetup}/>
           <Route path="/1" component={stepOne}/>
           <Route path="/2" component={stepTwo}/>
           <Route path="/3" component={stepThree}/>
