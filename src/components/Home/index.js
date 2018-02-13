@@ -55,7 +55,7 @@ export class Home extends Component {
               <br/>You can build an Airdrop now!
               </p>
               <div className="buttons">
-                <Link to='/2a'><span className="button button_outline">New Airdrop</span></Link>
+                <Link to='/airdropsetup'><span className="button button_outline">New Airdrop</span></Link>
                 <Link to='/1'><span className="button button_fill">New crowdsale</span></Link>
                 <div onClick={() => this.chooseContract()} className="button button_outline">Choose Contract</div>
               </div>
