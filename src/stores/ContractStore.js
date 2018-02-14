@@ -13,6 +13,7 @@ class ContractStore {
   @observable safeMathLib;
   @observable registry;
   @observable contractType;
+  @observable airdrop;
 
   constructor() {
     this.contractType = CONTRACT_TYPES.whitelistwithcap;
