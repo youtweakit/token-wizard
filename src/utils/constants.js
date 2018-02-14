@@ -6,7 +6,8 @@ export const defaultState = {
     multisig: {},
     nullFinalizeAgent: {addr:[], abiConstructor:[]},
     finalizeAgent: {addr:[], abiConstructor:[]},
-    tokenTransferProxy: {}
+    tokenTransferProxy: {},
+    airdrop: {addr:[], abiConstructor:[]}
   },
   token: {
     name: '',
@@ -25,6 +26,15 @@ export const defaultState = {
     whitelist: [],
     whitelistElements: [],
     whitelistInput: {}
+  }],
+  airdrop: [{
+    starts: '',
+    ends: '',
+    emergencyDrainAddress: '',
+    tokenAmmount: '',
+    airList: [],
+    airListElements:[],
+    airListInput:{}
   }],
   pricingStrategy: [{rate: ''}],
   blockTimeGeneration: 17,
@@ -52,7 +62,8 @@ export const defaultTiers = [{
 export const CONTRACT_TYPES = {
   standard: "standard",
   capped: "capped",
-  whitelistwithcap: "white-list-with-cap"
+  whitelistwithcap: "white-list-with-cap",
+  airdrop: "airdrop-whitelisted"
 }
 
 export const TRUNC_TO_DECIMALS = {
@@ -122,7 +133,9 @@ export const NAVIGATION_STEPS = {
   TOKEN_SETUP: 'Token Setup',
   CROWDSALE_SETUP: 'Crowdsale Setup',
   PUBLISH: 'Publish',
-  CROWDSALE_PAGE: 'Crowdsale Page'
+  CROWDSALE_PAGE: 'Crowdsale Page',
+  AIRDROP_SETUP: 'Airdrop Setup Page',
+  AIRDROP_STATS: 'Airdrop Statistics'
 }
 
 
@@ -171,7 +184,15 @@ export const TEXT_FIELDS = {
   MAX_CAP: 'Max cap',
   ALLOWMODIFYING: 'Allow modifying',
   ENABLE_WHITELISTING: 'Enable whitelisting',
-  GAS_PRICE: 'Gas Price'
+  GAS_PRICE: 'Gas Price',
+  AIRDROP_START: 'Airdrop Start Time',
+  AIRDROP_ENDS: 'Airdrop End Time',
+  AIRDROP_DRAIN_ADDRESS: 'Airdrop Emergency Drain Address',
+  AIRDROP_TOKENS_PER_ADDRESS: 'Tokens Per Address',
+  AIRDROP_IF_HAS_TOKEN: 'If Has This Token on Balance',
+  AIRDROP_TOKEN_CONTRACT: 'Token Contract Address',
+  AIRDROP_MIN: 'From Min',
+  AIRDROP_MAX: 'To Max'
 }
 
 export const VALIDATION_TYPES = {
@@ -429,5 +450,7 @@ export const TX_STEP_DESCRIPTION = {
   whitelist: "Register whitelisted addresses",
   setFinalizeAgent: "Register Finalize Agent Contract addresses",
   setReleaseAgent: "Register Token release addresses",
-  transferOwnership: "Transfer ownership to wallet address"
+  transferOwnership: "Transfer ownership to wallet address",
+  airdrop: "Deploy Airdrop Contract",
+  airdrop_finish: "Stop minting (endMinting)"
 }
