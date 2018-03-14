@@ -1,6 +1,7 @@
 import { observable, action, computed } from 'mobx';
-import { validateName, validateTicker, validateDecimals } from '../utils/utils'
+import { validateName, validateTicker } from '../utils/utils'
 import { VALIDATION_TYPES } from '../utils/constants'
+import autosave from './autosave'
 const { EMPTY, VALID, INVALID } = VALIDATION_TYPES;
 
 class TokenStore {
@@ -15,6 +16,7 @@ class TokenStore {
 
   constructor() {
     this.reset()
+    autosave(this, 'TokenStore')
   }
 
   @action reset = () => {
@@ -40,9 +42,11 @@ class TokenStore {
       this.validToken[property] = validateName(this.name) ? VALID : INVALID;
     } else if (property === 'ticker') {
       this.validToken[property] = validateTicker(this.ticker) ? VALID : INVALID;
-    } else {
-      this.validToken[property] = validateDecimals(this.decimals) ? VALID : INVALID;
     }
+  }
+
+  @action updateValidity = (property, validity) => {
+    this.validToken[property] = validity
   }
 
   @action invalidateToken = () => {
@@ -74,7 +78,4 @@ class TokenStore {
   }
 }
 
-const tokenStore = new TokenStore();
-
-export default tokenStore;
-export { TokenStore };
+export default TokenStore;

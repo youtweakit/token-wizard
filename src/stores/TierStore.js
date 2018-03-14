@@ -1,31 +1,30 @@
 import { observable, action, computed } from 'mobx';
-import { VALIDATION_TYPES, defaultTiers } from '../utils/constants'
+import { VALIDATION_TYPES } from '../utils/constants'
 import {
-  validateName, validateTime, validateSupply, validateRate, validateAddress, validateLaterTime,
-  validateLaterOrEqualTime, validateTier
+  validateTime,
+  validateSupply,
+  validateAddress,
+  validateLaterTime,
+  validateLaterOrEqualTime,
+  validateTier
 } from '../utils/utils'
+import autosave from './autosave'
 const { VALID, INVALID } = VALIDATION_TYPES
+
 class TierStore {
 
-  @observable tiers;
-  @observable validTiers;
-  @observable globalMinCap;
+  @observable tiers
+  @observable validTiers
+  @observable globalMinCap = ''
 
   constructor() {
     this.reset()
+    autosave(this, 'TierStore')
   }
 
   @action reset = () => {
-    this.tiers = defaultTiers.slice()
-    this.validTiers = [{
-      name: 'VALIDATED',
-      walletAddress: 'VALIDATED',
-      rate: 'EMPTY',
-      supply: 'EMPTY',
-      startTime: 'VALIDATED',
-      endTime: 'VALIDATED',
-      updatable: "VALIDATED"
-    }]
+    this.tiers = []
+    this.validTiers = []
   }
 
   @action setGlobalMinCap = (minCap) => {
@@ -60,34 +59,33 @@ class TierStore {
 
   @action validateTiers = (property, index) => {
     switch (property){
-      case 'name':
-        this.validTiers[index][property] = validateName(this.tiers[index][property]) ? VALID : INVALID
-        return
       case 'tier':
         this.validTiers[index][property] = validateTier(this.tiers[index][property]) ? VALID : INVALID
-        return
+        break
       case 'walletAddress':
         this.validTiers[index][property] = validateAddress(this.tiers[index][property]) ? VALID : INVALID
-        return
+        break
       case 'supply':
         this.validTiers[index][property] = validateSupply(this.tiers[index][property]) ? VALID : INVALID
-        return
-      case 'rate':
-        this.validTiers[index][property] = validateRate(this.tiers[index][property]) ? VALID : INVALID
-        return
+        break
       case 'startTime':
         if (index > 0) {
           this.validTiers[index][property] = validateLaterOrEqualTime(this.tiers[index][property], this.tiers[index - 1].endTime) ? VALID : INVALID
-          return
+        } else {
+          this.validTiers[index][property] = validateTime(this.tiers[index][property]) ? VALID: INVALID
         }
-        this.validTiers[index][property] = validateTime(this.tiers[index][property]) ? VALID: INVALID
-        return
+        break
       case 'endTime':
         this.validTiers[index][property] = validateLaterTime(this.tiers[index][property], this.tiers[index].startTime) ? VALID : INVALID
-        return
+        break
       default:
         // do nothing
     }
+  }
+
+  @action updateRate = (value, validity, tierIndex) => {
+    this.tiers[tierIndex].rate = value
+    this.validTiers[tierIndex].rate = validity
   }
 
   @action validateEditedTier = (property, index) => {
@@ -101,7 +99,7 @@ class TierStore {
         }
 
         this.validTiers[index][property] = lessThanNextStart && laterTime ? VALID : INVALID
-        return
+        break
       case 'startTime':
         let notLaterTime = true
         const previousToEndTime = validateLaterTime(this.tiers[index].endTime, this.tiers[index][property])
@@ -112,9 +110,9 @@ class TierStore {
         }
 
         this.validTiers[index][property] = notLaterTime && previousToEndTime && validTime ? VALID : INVALID
-        return
+        break
       default:
-        return
+        // Nothing
     }
   }
 
@@ -138,15 +136,16 @@ class TierStore {
       return;
     }
 
-    const isValid = this.validTiers.every((tier, index) => Object.keys(tier).every((key) => {
-      console.log('key', key, this.validTiers[index][key])
-      if (this.validTiers[index][key] === VALID) {
-        return true;
-      } else {
-        return false;
-      }
-    }))
+    const isValid = this.validTiers.every((tier, index) => {
+      return Object.keys(tier)
+        .every((key) => {
+          console.log('key', key, this.validTiers[index][key])
+          return this.validTiers[index][key] === VALID
+        })
+    })
+
     console.log('isValid', isValid)
+
     return isValid
   }
 
@@ -163,14 +162,34 @@ class TierStore {
     });
   }
 
-  @action removeWhiteListItem = (whitelistNum, crowdsaleNum) => {
+  @action addWhitelistItem = ({ addr, min, max }, crowdsaleNum) => {
+    const tier = this.tiers[crowdsaleNum]
+
+    const whitelist = tier.whitelist.slice()
+
+    const isAdded = whitelist.find(item => item.addr === addr && !item.deleted)
+
+    if (isAdded) return
+
+    const whitelistElements = tier.whitelistElements.slice()
+    const whitelistNum = whitelistElements.length
+
+    whitelistElements.push({ addr, min, max, whitelistNum, crowdsaleNum })
+    whitelist.push({ addr, min, max })
+
+    this.setTierProperty(whitelistElements, 'whitelistElements', crowdsaleNum)
+    this.setTierProperty(whitelist, 'whitelist', crowdsaleNum)
+  }
+
+  @action removeWhitelistItem = (whitelistNum, crowdsaleNum) => {
     let whitelist = this.tiers[crowdsaleNum].whitelist.slice()
     whitelist[whitelistNum].deleted = true
     this.setTierProperty(whitelist, 'whitelist', crowdsaleNum)
   }
+
+  @computed get maxSupply () {
+    return this.tiers.map(tier => +tier.supply).reduce((a, b) => Math.max(a, b), 0)
+  }
 }
 
-const tierStore = new TierStore();
-
-export default tierStore;
-export { TierStore };
+export default TierStore;

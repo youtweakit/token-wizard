@@ -8,7 +8,7 @@ import {
   sendTXToContract
 } from '../../utils/blockchainHelpers'
 import { noContractAlert, noContractDataAlert } from '../../utils/alerts'
-import { floorToDecimals, toFixed } from '../../utils/utils'
+import { countDecimalPlaces, floorToDecimals, toFixed } from '../../utils/utils'
 import { CONTRACT_TYPES, DOWNLOAD_NAME, TRUNC_TO_DECIMALS } from '../../utils/constants'
 import { isObservableArray } from 'mobx'
 import {
@@ -21,6 +21,7 @@ import {
   web3Store
 } from '../../stores'
 import { getEncodedABIClientSide } from '../../utils/microservices'
+import { BigNumber } from 'bignumber.js'
 
 export const setupContractDeployment = () => {
   if (!contractStore.safeMathLib) {
@@ -147,7 +148,9 @@ export const deployToken = () => {
 }
 
 const getPricingStrategyParams = tier => {
-  const oneTokenInETH = floorToDecimals(TRUNC_TO_DECIMALS.DECIMALS18, 1 / tier.rate)
+  BigNumber.config({ DECIMAL_PLACES: 18 })
+  const rate = new BigNumber(tier.rate)
+  const oneTokenInETH = rate.pow(-1).toFixed()
 
   return [
     web3Store.web3.utils.toWei(oneTokenInETH, 'ether')
@@ -402,7 +405,6 @@ export const addWhitelist = () => {
 
       for (let i = 0; i <= round; i++) {
         const tier = tierStore.tiers[i]
-        const whitelistInput = tier.whitelistInput
 
         for (let j = 0; j < tier.whitelist.length; j++) {
           let itemIsAdded = false
@@ -416,25 +418,6 @@ export const addWhitelist = () => {
 
           if (!itemIsAdded) {
             whitelist.push.apply(whitelist, tier.whitelist)
-          }
-        }
-
-        if (whitelistInput.addr && whitelistInput.min && whitelistInput.max) {
-          let itemIsAdded = false
-
-          for (let k = 0; k < whitelist.length; k++) {
-            if (whitelist[k].addr === whitelistInput.addr) {
-              itemIsAdded = true
-              break
-            }
-          }
-
-          if (!itemIsAdded) {
-            whitelist.push({
-              'addr': whitelistInput.addr,
-              'min': whitelistInput.min,
-              'max': whitelistInput.max
-            })
           }
         }
       }
@@ -617,7 +600,7 @@ export const setReservedTokensListMultiple = () => {
             if (reservedTokens[i].dim === 'tokens') {
               obj.inTokens = val * 10 ** tokenStore.decimals
             } else {
-              obj.inPercentageDecimals = countDecimals(val)
+              obj.inPercentageDecimals = countDecimalPlaces(val)
               obj.inPercentageUnit = val * 10 ** obj.inPercentageDecimals
             }
             map[addr] = obj
@@ -787,9 +770,4 @@ export function getDownloadName (tokenAddress) {
 
     resolve(whenNetworkName)
   })
-}
-
-var countDecimals = function (inputFloat) {
-  if (Math.floor(inputFloat) === parseFloat(inputFloat)) return 0
-  return inputFloat.toString().split('.')[1].length || 0
 }

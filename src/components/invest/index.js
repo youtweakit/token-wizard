@@ -11,7 +11,8 @@ import {
   getJoinedTiers,
   initializeAccumulativeData
 } from '../crowdsale/utils'
-import { getQueryVariable, getWhiteListWithCapCrowdsaleAssets, toast } from '../../utils/utils'
+import { countDecimalPlaces, getQueryVariable, toast } from '../../utils/utils'
+import { getWhiteListWithCapCrowdsaleAssets } from '../../stores/utils'
 import {
   invalidCrowdsaleAddrAlert,
   investmentDisabledAlertInTime, noGasPriceAvailable,
@@ -146,10 +147,9 @@ export class Invest extends React.Component {
 
     this.setState({ loading: true })
 
-    const startBlock = parseInt(crowdsalePageStore.startBlock, 10)
     const { startDate } = crowdsalePageStore
 
-    if ((isNaN(startBlock) || startBlock === 0) && !startDate) {
+    if (!startDate) {
       this.setState({ loading: false })
       return
     }
@@ -246,7 +246,7 @@ export class Invest extends React.Component {
   }
 
   isValidToken(token) {
-    return +token > 0
+    return +token > 0 && countDecimalPlaces(token) <= this.props.tokenStore.decimals
   }
 
   renderPieTracker () {
@@ -309,7 +309,11 @@ export class Invest extends React.Component {
 
     let invalidTokenDescription = null
     if (!pristineTokenInput && !this.isValidToken(tokensToInvest)) {
-      invalidTokenDescription = <p className="error">Number of tokens to buy should be positive</p>
+      invalidTokenDescription = (
+        <p className="error">
+          Number of tokens to buy should be positive and should not exceed {decimals} decimals.
+        </p>
+      )
     }
 
     const QRPaymentProcessElement = investThrough === INVESTMENT_OPTIONS.QR ?
