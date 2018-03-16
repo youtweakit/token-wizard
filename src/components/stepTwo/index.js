@@ -172,6 +172,7 @@ export class stepTwo extends Component {
           </div>
           <div className="reserved-tokens-title">
             <p className="title">Reserved tokens</p>
+            <p className="title">We can add Reserved for Airdrop tokens ammount</p>
           </div>
           <ReservedTokensInputBlock
             tokens={this.props.reservedTokenStore.tokens}
